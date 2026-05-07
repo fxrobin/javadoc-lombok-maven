@@ -1,0 +1,53 @@
+-J-Duser.language=
+-J-Duser.country=
+@options
+@argfile
+--no-fonts
+-classpath
+'/home/robin/.m2/repository/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar'
+-encoding
+'UTF-8'
+-protected
+-source
+'25'
+-sourcepath
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok'
+-author
+-bottom
+'Copyright &#169; 2026. All rights reserved.'
+-charset
+'UTF-8'
+-d
+'/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'Maven Javadoc Lombok Java 25 Demo 1.0.0 API'
+-use
+-version
+-windowtitle
+'Maven Javadoc Lombok Java 25 Demo 1.0.0 API'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/vehicules/Vehicule.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/vehicules/package-info.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/vehicules/VehiculeUtils.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/vehicules/Energy.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/package-info.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/garage/package-info.java'
+'/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok/fr/fxjavadevblog/mvnlmbkjdoc/garage/Garage.java'
+/home/robin/.m2/repository/org/projectlombok/lombok/1.18.46/lombok-1.18.46.jar = 1776813716000
+/home/robin/dev/javadoc-lombok-maven/target/generated-sources/delombok = 1778056764091
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/package-search-index.js = 1778056765213
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/index.html = 1778056765206
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/serialized-form.html = 1778056765192
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/element-list = 1778056765182
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/allclasses-index.html = 1778056765211
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/allpackages-index.html = 1778056765211
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/type-search-index.js = 1778056765213
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/member-search-index.js = 1778056765213
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/overview-summary.html = 1778056765217
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/overview-tree.html = 1778056765205
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/help-doc.html = 1778056765219
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/index-all.html = 1778056765216
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/tag-search-index.js = 1778056765213
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/search.html = 1778056765216
+/home/robin/dev/javadoc-lombok-maven/target/reports/apidocs/module-search-index.js = 1778056765213
