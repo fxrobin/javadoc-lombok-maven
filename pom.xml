@@ -83,6 +83,14 @@
                         <version>3.12.0</version>
                         <configuration>
                             <sourcepath>${project.build.directory}/generated-sources/delombok</sourcepath>
+                            <!-- Suppress "missing" doclint category for Lombok-generated methods
+                                 (builder setter @param and build() comment are not controllable from source) -->
+                            <doclint>all,-missing</doclint>
+                            <additionalOptions>
+                                <additionalOption>-tag "apiNote:a:API Note:"</additionalOption>
+                                <additionalOption>-tag "implSpec:a:Implementation Requirements:"</additionalOption>
+                                <additionalOption>-tag "implNote:a:Implementation Note:"</additionalOption>
+                            </additionalOptions>
                         </configuration>
                     </plugin>
                 </plugins>
