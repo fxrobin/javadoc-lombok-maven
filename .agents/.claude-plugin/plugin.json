@@ -1,0 +1,9 @@
+{
+  "name": "javadoc-skills",
+  "description": "Javadoc best practices skills for Lombok-annotated Java projects — human-readable and AI/agent-optimized",
+  "version": "1.0.0",
+  "author": {
+    "name": "F.X. ROBIN",
+    "email": "fxrobin@gmail.com"
+  }
+}
