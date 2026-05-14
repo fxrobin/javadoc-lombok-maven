@@ -1,8 +1,8 @@
 class LombokJavadocPropagator {
 
-    // Returns true if the file's class-level Javadoc contains the -- BUILDER -- marker.
-    boolean hasBuilderMarker(List<String> lines) {
-        lines.any { it.trim() == '* -- BUILDER --' }
+    // Returns true if the source file declares @Builder (any Lombok builder variant).
+    boolean hasBuilderAnnotation(List<String> lines) {
+        lines.any { it.trim() =~ /^@(lombok\.)?Builder(\(.*\))?$/ }
     }
 
     // Extracts @return text from getter methods.
@@ -150,13 +150,13 @@ class LombokJavadocPropagator {
         return result
     }
 
-    // delombok strips non-standard markers (-- BUILDER --, -- BUILDER-PARAM --),
-    // so read markers from source file, getter returns from delombok file.
+    // @Builder annotation is read from source file; delombok strips -- BUILDER-PARAM --
+    // markers from field Javadoc, so source is authoritative for both.
     void processFile(File delombokFile, File delombokBaseDir, File sourceBaseDir) {
         def relPath     = delombokBaseDir.toPath().relativize(delombokFile.toPath()).toString()
         def sourceFile  = new File(sourceBaseDir, relPath)
         def sourceLines = sourceFile.exists() ? sourceFile.readLines('UTF-8') : []
-        if (!hasBuilderMarker(sourceLines)) return
+        if (!hasBuilderAnnotation(sourceLines)) return
         def delombokLines = delombokFile.readLines('UTF-8')
         def getterReturns = extractGetterReturns(delombokLines)
         def overrides     = extractBuilderParamOverrides(sourceLines)
@@ -168,11 +168,7 @@ class LombokJavadocPropagator {
     void runSelfTests() {
         // ── Test 1-4: basic case (body + @return -> @param + @return this builder) ──
         def input = [
-            '/**',
-            ' * Test class.',
-            ' *',
-            ' * -- BUILDER --',
-            ' */',
+            '@Builder',
             'public class Foo {',
             '    /**',
             '     * The name. Never null.',
@@ -208,9 +204,9 @@ class LombokJavadocPropagator {
             '}',
         ]
 
-        assert hasBuilderMarker(input), "Should detect -- BUILDER -- marker"
-        assert !hasBuilderMarker(['/** no marker */', 'public class Bar {}']),
-               "Should NOT detect marker when absent"
+        assert hasBuilderAnnotation(input), "Should detect @Builder annotation"
+        assert !hasBuilderAnnotation(['/** no marker */', 'public class Bar {}']),
+               "Should NOT detect without @Builder"
 
         def getterReturns = extractGetterReturns(input)
         assert getterReturns['name'] == 'the name; never null',
@@ -230,9 +226,7 @@ class LombokJavadocPropagator {
 
         // ── Test 5: -- BUILDER-PARAM -- override ────────────────────────
         def overrideInput = [
-            '/**',
-            ' * -- BUILDER --',
-            ' */',
+            '@Builder',
             'public class Bar {',
             '    /**',
             '     * The count.',
