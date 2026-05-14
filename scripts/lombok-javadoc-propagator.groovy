@@ -104,14 +104,19 @@ class LombokJavadocPropagator {
         return result
     }
 
-    void processFile(File file) {
-        def lines = file.readLines('UTF-8')
-        if (!hasBuilderMarker(lines)) return
-        def getterReturns = extractGetterReturns(lines)
-        def overrides     = extractBuilderParamOverrides(lines)
-        def patched       = patchBuilderSetters(lines, getterReturns, overrides)
-        file.write(patched.join('\n') + '\n', 'UTF-8')
-        println "  Patched: ${file.name} (${getterReturns.size()} getters found)"
+    // delombok strips non-standard markers (-- BUILDER --, -- BUILDER-PARAM --),
+    // so read markers from source file, getter returns from delombok file.
+    void processFile(File delombokFile, File delombokBaseDir, File sourceBaseDir) {
+        def relPath     = delombokBaseDir.toPath().relativize(delombokFile.toPath()).toString()
+        def sourceFile  = new File(sourceBaseDir, relPath)
+        def sourceLines = sourceFile.exists() ? sourceFile.readLines('UTF-8') : []
+        if (!hasBuilderMarker(sourceLines)) return
+        def delombokLines = delombokFile.readLines('UTF-8')
+        def getterReturns = extractGetterReturns(delombokLines)
+        def overrides     = extractBuilderParamOverrides(sourceLines)
+        def patched       = patchBuilderSetters(delombokLines, getterReturns, overrides)
+        delombokFile.write(patched.join('\n') + '\n', 'UTF-8')
+        println "  Patched: ${delombokFile.name} (${getterReturns.size()} getters found)"
     }
 
     void runSelfTests() {
@@ -222,10 +227,11 @@ class LombokJavadocPropagator {
 // When invoked standalone (groovy scripts/...), run self-tests.
 if (binding.hasVariable('project')) {
     def delombokDir = new File(project.build.directory, 'generated-sources/delombok')
+    def sourceDir   = new File(project.build.sourceDirectory)
     println "LombokJavadocPropagator: scanning ${delombokDir}"
     def propagator = new LombokJavadocPropagator()
     delombokDir.eachFileRecurse { file ->
-        if (file.name.endsWith('.java')) propagator.processFile(file)
+        if (file.name.endsWith('.java')) propagator.processFile(file, delombokDir, sourceDir)
     }
     println "LombokJavadocPropagator: done."
 } else {
