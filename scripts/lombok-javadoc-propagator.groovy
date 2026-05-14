@@ -48,33 +48,80 @@ class LombokJavadocPropagator {
         return result
     }
 
-    // Patches builder setter Javadoc:
+    // Returns true if result buffer has a Javadoc closing */ before the last sequence
+    // of blank lines and annotation lines.
+    boolean hasPrecedingJavadoc(List<String> result) {
+        for (int i = result.size() - 1; i >= 0; i--) {
+            def t = result[i].trim()
+            if (t.isEmpty() || t.startsWith('@')) continue
+            return t == '*/'
+        }
+        return false
+    }
+
+    // Patches delombok builder class output:
+    // - Injects class Javadoc on XxxBuilder if absent
+    // - Injects Javadoc on build() method if absent
     // - Replaces `@return {@code this}.` with `@param fieldName <text>` + `@return this builder`
     // - If field has a -- BUILDER-PARAM -- override, replaces entire Javadoc with override content
     List<String> patchBuilderSetters(List<String> lines,
                                       Map<String, String> getterReturns,
                                       Map<String, String> overrides) {
         def result = []
+        def outerClassName = null
+
         for (int i = 0; i < lines.size(); i++) {
             def line    = lines[i]
             def trimmed = line.trim()
+            def indent  = line.replaceFirst(/\S.*/, '')
 
-            // Match builder setter: public *Builder methodName(final Type methodName)
-            // (method name and parameter name must be identical)
+            // ── Builder class declaration ──────────────────────────────
+            def classM = (trimmed =~ /^public static class (\w+)Builder\s*\{/)
+            if (classM) {
+                outerClassName = classM[0][1]
+                if (!hasPrecedingJavadoc(result)) {
+                    def annotations = []
+                    while (result && result.last().trim().startsWith('@')) {
+                        annotations.add(0, result.removeLast())
+                    }
+                    result << "${indent}/**"
+                    result << "${indent} * Builder class for {@link ${outerClassName}}."
+                    result << "${indent} */"
+                    result.addAll(annotations)
+                }
+                result << line
+                continue
+            }
+
+            // ── build() termination method ─────────────────────────────
+            if (outerClassName && (trimmed =~ /^public\s+\S+\s+build\s*\(\s*\)\s*\{/)) {
+                def annotations = []
+                while (result && result.last().trim().startsWith('@')) {
+                    annotations.add(0, result.removeLast())
+                }
+                if (!hasPrecedingJavadoc(result)) {
+                    result << "${indent}/**"
+                    result << "${indent} * Builds and returns a new {@link ${outerClassName}} instance."
+                    result << "${indent} * @return new {@link ${outerClassName}} instance; never {@code null}"
+                    result << "${indent} */"
+                }
+                result.addAll(annotations)
+                result << line
+                continue
+            }
+
+            // ── Builder setter methods ─────────────────────────────────
             def m = (trimmed =~ /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/)
             if (m && m[0][1] == m[0][2]) {
                 def fieldName = m[0][1]
                 def override  = overrides[fieldName]
-                def indent    = line.replaceFirst(/\S.*/, '')
 
-                // Pop preceding annotations (@SuppressWarnings, @lombok.Generated, etc.)
                 def annotations = []
                 while (result && result.last().trim().startsWith('@')) {
                     annotations.add(0, result.removeLast())
                 }
 
                 if (override != null) {
-                    // Remove existing Javadoc block and replace with override
                     if (result && result.last().trim() == '*/') {
                         while (result && !result.last().trim().startsWith('/**')) result.removeLast()
                         if (result) result.removeLast()
@@ -83,7 +130,6 @@ class LombokJavadocPropagator {
                     override.split('\n').each { result << "${indent} * ${it}" }
                     result << "${indent} */"
                 } else {
-                    // Replace `@return {@code this}.` with @param + @return this builder
                     def returnText = getterReturns[fieldName] ?: ''
                     int limit = Math.max(0, result.size() - 20)
                     for (int j = result.size() - 1; j >= limit; j--) {
