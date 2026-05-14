@@ -40,6 +40,8 @@ import lombok.ToString;
  * @version 1.0
  * @see Vehicule
  * @see <a href="https://fxjavadevblog.fr">FX Java Dev Blog</a>
+ *
+ * -- BUILDER --
  */
 @ToString
 @Builder

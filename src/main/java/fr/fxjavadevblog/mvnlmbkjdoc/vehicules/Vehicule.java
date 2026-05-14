@@ -33,6 +33,8 @@ import lombok.ToString;
  * @see fr.fxjavadevblog.mvnlmbkjdoc.garage.Garage
  * @see Energy
  * @see <a href="https://www.fxjavadevblog.fr">FX Java Dev Blog</a>
+ *
+ * -- BUILDER --
  */
 @Builder
 @EqualsAndHashCode(of = "registrationNumber")
