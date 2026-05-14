@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html","k":"18"},{"l":"fr.fxjavadevblog.mvnlmbkjdoc.garage"},{"l":"fr.fxjavadevblog.mvnlmbkjdoc.vehicules"}];updateSearchResults();
