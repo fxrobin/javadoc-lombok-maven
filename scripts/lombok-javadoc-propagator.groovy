@@ -100,6 +100,21 @@ class LombokJavadocPropagator {
                 continue
             }
 
+            // ── builder() static factory ──────────────────────────────
+            if (outerClassName && (trimmed =~ /^public\s+static\s+\S+\s+builder\s*\(\s*\)\s*\{/)) {
+                def annotations = collectPrecedingAnnotations(result)
+                if (!hasPrecedingJavadoc(result)) {
+                    result << "${indent}/**"
+                    result << "${indent} * Creates a new {@link ${outerClassName}Builder} to build a {@link ${outerClassName}} instance."
+                    result << "${indent} *"
+                    result << "${indent} * @return a new {@link ${outerClassName}Builder}; never {@code null}"
+                    result << "${indent} */"
+                }
+                result.addAll(annotations)
+                result << line
+                continue
+            }
+
             // ── Builder setter methods ─────────────────────────────────
             def m = (trimmed =~ /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/)
             if (m && m[0][1] == m[0][2]) {
@@ -602,6 +617,10 @@ class LombokJavadocPropagator {
             '',
             '        public Foo build() { return new Foo(name); }',
             '    }',
+            '',
+            '    @java.lang.SuppressWarnings("all")',
+            '    @lombok.Generated',
+            '    public static FooBuilder builder() { return new FooBuilder(); }',
             '}',
         ]
 
@@ -619,6 +638,7 @@ class LombokJavadocPropagator {
         assert txt.contains('@param name the name; never null'), "Missing @param:\n${txt}"
         assert txt.contains('@return this builder'), "Missing @return this builder"
         assert !txt.contains('@return {@code this}'), "Old @return not replaced"
+        assert txt.contains('Creates a new {@link FooBuilder}'), "builder() Javadoc missing:\n${txt}"
 
         // ── BUILDER-PARAM override ───────────────────────────────────────────
         def ovInput = [
