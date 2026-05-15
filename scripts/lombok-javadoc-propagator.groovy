@@ -65,16 +65,23 @@ class LombokJavadocPropagator {
                                       Map<String, String> overrides) {
         def result = []
         def outerClassName = null
+        int builderDepth = 0  // > 0 while inside the XxxBuilder class body
 
         for (int i = 0; i < lines.size(); i++) {
             def line    = lines[i]
             def trimmed = line.trim()
             def indent  = line.replaceFirst(/\S.*/, '')
 
+            // Track depth inside the builder class
+            if (builderDepth > 0) {
+                builderDepth += trimmed.count('{') - trimmed.count('}')
+            }
+
             // ── Builder class declaration ──────────────────────────────
             def classM = (trimmed =~ /^public static class (\w+)Builder\s*\{/)
             if (classM) {
                 outerClassName = classM[0][1]
+                builderDepth = 1
                 if (!hasPrecedingJavadoc(result)) {
                     def annotations = collectPrecedingAnnotations(result)
                     result << "${indent}/**"
@@ -93,6 +100,23 @@ class LombokJavadocPropagator {
                     result << "${indent}/**"
                     result << "${indent} * Builds and returns a new {@link ${outerClassName}} instance."
                     result << "${indent} * @return new {@link ${outerClassName}} instance; never {@code null}"
+                    result << "${indent} */"
+                }
+                result.addAll(annotations)
+                result << line
+                continue
+            }
+
+            // ── Builder toString() ────────────────────────────────────
+            if (builderDepth > 0 && outerClassName &&
+                (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
+                def annotations = collectPrecedingAnnotations(result)
+                if (!hasPrecedingJavadoc(result)) {
+                    result << "${indent}/**"
+                    result << "${indent} * Returns a string representation of the current ${outerClassName}Builder state."
+                    result << "${indent} * Shows all field values set so far; useful for debugging."
+                    result << "${indent} *"
+                    result << "${indent} * @return string representation of this builder; never {@code null}"
                     result << "${indent} */"
                 }
                 result.addAll(annotations)
@@ -616,6 +640,11 @@ class LombokJavadocPropagator {
             '        }',
             '',
             '        public Foo build() { return new Foo(name); }',
+            '',
+            '        @java.lang.Override',
+            '        @java.lang.SuppressWarnings("all")',
+            '        @lombok.Generated',
+            '        public java.lang.String toString() { return "FooBuilder(name=" + this.name + ")"; }',
             '    }',
             '',
             '    @java.lang.SuppressWarnings("all")',
@@ -639,6 +668,8 @@ class LombokJavadocPropagator {
         assert txt.contains('@return this builder'), "Missing @return this builder"
         assert !txt.contains('@return {@code this}'), "Old @return not replaced"
         assert txt.contains('Creates a new {@link FooBuilder}'), "builder() Javadoc missing:\n${txt}"
+        assert txt.contains('Returns a string representation of the current FooBuilder state.'),
+            "builder toString() Javadoc missing:\n${txt}"
 
         // ── BUILDER-PARAM override ───────────────────────────────────────────
         def ovInput = [
