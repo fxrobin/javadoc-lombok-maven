@@ -368,6 +368,23 @@ class LombokJavadocPropagator {
                     result << line; continue
                 }
 
+                // ── canEqual() ───────────────────────────────────────
+                if (eqParams &&
+                    trimmed =~ /^protected\s+boolean\s+canEqual\s*\(/) {
+                    if (!hasPrecedingJavadoc(result)) {
+                        def annotations = collectPrecedingAnnotations(result)
+                        result << "${indent}/**"
+                        result << "${indent} * Returns whether another object can be considered equal to this instance."
+                        result << "${indent} * Used internally by {@link #equals} to support correct behavior with subclasses."
+                        result << "${indent} *"
+                        result << "${indent} * @param other the object to test; may be {@code null}"
+                        result << "${indent} * @return {@code true} if {@code other} is an instance of {@link ${className}}; {@code false} otherwise"
+                        result << "${indent} */"
+                        result.addAll(annotations)
+                    }
+                    result << line; continue
+                }
+
                 // ── hashCode() ────────────────────────────────────────
                 if (eqParams && eqFields &&
                     trimmed =~ /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/) {
@@ -708,6 +725,10 @@ class LombokJavadocPropagator {
             '    @lombok.Generated',
             '    public boolean equals(final java.lang.Object o) { return false; }',
             '',
+            '    @java.lang.SuppressWarnings("all")',
+            '    @lombok.Generated',
+            '    protected boolean canEqual(final java.lang.Object other) { return false; }',
+            '',
             '    @java.lang.Override',
             '    @java.lang.SuppressWarnings("all")',
             '    @lombok.Generated',
@@ -730,6 +751,9 @@ class LombokJavadocPropagator {
         assert patchedTxt.contains('Returns a string representation of this instance.'),
             "toString Javadoc missing:\n${patchedTxt}"
         assert patchedTxt.contains('Includes: {@code id}.'), "toString field list missing"
+        assert patchedTxt.contains('Returns whether another object can be considered equal'),
+            "canEqual Javadoc missing:\n${patchedTxt}"
+        assert patchedTxt.contains('@param other the object to test'), "canEqual @param missing"
 
         // ── removeParagraphsMatching ──────────────────────────────────────────
         def javadoc = [
