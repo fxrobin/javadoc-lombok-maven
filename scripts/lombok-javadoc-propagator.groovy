@@ -341,7 +341,80 @@ class LombokJavadocPropagator {
 
     // ─── @ToString / @EqualsAndHashCode method Javadoc injection ─────────────
 
-    // Injects Javadoc on toString(), equals(), hashCode() at outer class level only.
+    private void injectToStringJavadoc(List<String> result, String indent,
+                                        String className, List<String> fields, Map params) {
+        if (hasPrecedingJavadoc(result)) return
+        def annotations = collectPrecedingAnnotations(result)
+        def fieldRefs   = fields.collect { "{@code ${it}}" }.join(', ')
+        def format      = params.includeFieldNames
+            ? "${className}(" + fields.collect { "${it}=…" }.join(', ') + ")"
+            : "${className}(" + fields.collect { '…' }.join(', ') + ")"
+        result << "${indent}/**"
+        result << "${indent} * Returns a string representation of this instance."
+        result << "${indent} * Includes: ${fieldRefs}."
+        if (!params.includeFieldNames)
+            result << "${indent} * Values only, no field names."
+        result << "${indent} * Format: {@code ${format}}."
+        if (params.callSuper)
+            result << "${indent} * Includes fields from superclass."
+        result << "${indent} *"
+        result << "${indent} * @return string representation; never {@code null}"
+        result << "${indent} */"
+        result.addAll(annotations)
+    }
+
+    private void injectEqualsJavadoc(List<String> result, String indent,
+                                      List<String> fields, Map params) {
+        if (hasPrecedingJavadoc(result)) return
+        def annotations = collectPrecedingAnnotations(result)
+        def fieldRefs   = fields.collect { "{@code ${it}}" }
+        result << "${indent}/**"
+        if (fields.size() == 1) {
+            result << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
+        } else {
+            result << "${indent} * Two instances are equal when all these fields are equal:"
+            result << "${indent} * ${fieldRefs.join(', ')}."
+        }
+        if (params.callSuper)
+            result << "${indent} * Includes fields from superclass."
+        result << "${indent} *"
+        result << "${indent} * @param o the object to compare with; may be {@code null}"
+        if (fields.size() == 1) {
+            result << "${indent} * @return {@code true} if ${fieldRefs[0]} is equal; {@code false} otherwise"
+        } else {
+            result << "${indent} * @return {@code true} when all fields match; {@code false} otherwise"
+        }
+        result << "${indent} */"
+        result.addAll(annotations)
+    }
+
+    private void injectCanEqualJavadoc(List<String> result, String indent, String className) {
+        if (hasPrecedingJavadoc(result)) return
+        def annotations = collectPrecedingAnnotations(result)
+        result << "${indent}/**"
+        result << "${indent} * Returns whether another object can be considered equal to this instance."
+        result << "${indent} * Used internally by {@link #equals} to support correct behavior with subclasses."
+        result << "${indent} *"
+        result << "${indent} * @param other the object to test; may be {@code null}"
+        result << "${indent} * @return {@code true} if {@code other} is an instance of {@link ${className}}; {@code false} otherwise"
+        result << "${indent} */"
+        result.addAll(annotations)
+    }
+
+    private void injectHashCodeJavadoc(List<String> result, String indent, List<String> fields) {
+        if (hasPrecedingJavadoc(result)) return
+        def annotations = collectPrecedingAnnotations(result)
+        def fieldRefs   = fields.collect { "{@code ${it}}" }.join(', ')
+        result << "${indent}/**"
+        result << "${indent} * Returns a hash code consistent with {@link #equals}."
+        result << "${indent} * Based on: ${fieldRefs}."
+        result << "${indent} *"
+        result << "${indent} * @return the computed hash code"
+        result << "${indent} */"
+        result.addAll(annotations)
+    }
+
+    // Injects Javadoc on toString(), equals(), canEqual(), hashCode() at outer class level only.
     // Uses brace-depth tracking to skip methods inside nested classes (e.g. XxxBuilder).
     List<String> patchToStringEqualsHashCode(List<String> lines,
                                               List<String> tsFields, Map tsParams,
@@ -359,91 +432,27 @@ class LombokJavadocPropagator {
             braceDepth += trimmed.count('{') - trimmed.count('}')
 
             if (lineStartDepth == 1) {
-
-                // ── toString() ────────────────────────────────────────
                 if (tsParams && tsFields &&
-                    trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/) {
-                    if (!hasPrecedingJavadoc(result)) {
-                        def annotations = collectPrecedingAnnotations(result)
-                        def fieldRefs   = tsFields.collect { "{@code ${it}}" }.join(', ')
-                        def format      = tsParams.includeFieldNames
-                            ? "${className}(" + tsFields.collect { "${it}=…" }.join(', ') + ")"
-                            : "${className}(" + tsFields.collect { '…' }.join(', ') + ")"
-                        result << "${indent}/**"
-                        result << "${indent} * Returns a string representation of this instance."
-                        result << "${indent} * Includes: ${fieldRefs}."
-                        if (!tsParams.includeFieldNames)
-                            result << "${indent} * Values only, no field names."
-                        result << "${indent} * Format: {@code ${format}}."
-                        if (tsParams.callSuper)
-                            result << "${indent} * Includes fields from superclass."
-                        result << "${indent} *"
-                        result << "${indent} * @return string representation; never {@code null}"
-                        result << "${indent} */"
-                        result.addAll(annotations)
-                    }
+                    (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
+                    injectToStringJavadoc(result, indent, className, tsFields, tsParams)
                     result << line; continue
                 }
 
-                // ── equals() ─────────────────────────────────────────
                 if (eqParams && eqFields &&
-                    trimmed =~ /^public\s+boolean\s+equals\s*\(/) {
-                    if (!hasPrecedingJavadoc(result)) {
-                        def annotations = collectPrecedingAnnotations(result)
-                        def fieldRefs   = eqFields.collect { "{@code ${it}}" }
-                        result << "${indent}/**"
-                        if (eqFields.size() == 1) {
-                            result << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
-                        } else {
-                            result << "${indent} * Two instances are equal when all these fields are equal:"
-                            result << "${indent} * ${fieldRefs.join(', ')}."
-                        }
-                        if (eqParams.callSuper)
-                            result << "${indent} * Includes fields from superclass."
-                        result << "${indent} *"
-                        result << "${indent} * @param o the object to compare with; may be {@code null}"
-                        if (eqFields.size() == 1) {
-                            result << "${indent} * @return {@code true} if ${fieldRefs[0]} is equal; {@code false} otherwise"
-                        } else {
-                            result << "${indent} * @return {@code true} when all fields match; {@code false} otherwise"
-                        }
-                        result << "${indent} */"
-                        result.addAll(annotations)
-                    }
+                    (trimmed =~ /^public\s+boolean\s+equals\s*\(/)) {
+                    injectEqualsJavadoc(result, indent, eqFields, eqParams)
                     result << line; continue
                 }
 
-                // ── canEqual() ───────────────────────────────────────
                 if (eqParams &&
-                    trimmed =~ /^protected\s+boolean\s+canEqual\s*\(/) {
-                    if (!hasPrecedingJavadoc(result)) {
-                        def annotations = collectPrecedingAnnotations(result)
-                        result << "${indent}/**"
-                        result << "${indent} * Returns whether another object can be considered equal to this instance."
-                        result << "${indent} * Used internally by {@link #equals} to support correct behavior with subclasses."
-                        result << "${indent} *"
-                        result << "${indent} * @param other the object to test; may be {@code null}"
-                        result << "${indent} * @return {@code true} if {@code other} is an instance of {@link ${className}}; {@code false} otherwise"
-                        result << "${indent} */"
-                        result.addAll(annotations)
-                    }
+                    (trimmed =~ /^protected\s+boolean\s+canEqual\s*\(/)) {
+                    injectCanEqualJavadoc(result, indent, className)
                     result << line; continue
                 }
 
-                // ── hashCode() ────────────────────────────────────────
                 if (eqParams && eqFields &&
-                    trimmed =~ /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/) {
-                    if (!hasPrecedingJavadoc(result)) {
-                        def annotations = collectPrecedingAnnotations(result)
-                        def fieldRefs   = eqFields.collect { "{@code ${it}}" }.join(', ')
-                        result << "${indent}/**"
-                        result << "${indent} * Returns a hash code consistent with {@link #equals}."
-                        result << "${indent} * Based on: ${fieldRefs}."
-                        result << "${indent} *"
-                        result << "${indent} * @return the computed hash code"
-                        result << "${indent} */"
-                        result.addAll(annotations)
-                    }
+                    (trimmed =~ /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/)) {
+                    injectHashCodeJavadoc(result, indent, eqFields)
                     result << line; continue
                 }
             }
