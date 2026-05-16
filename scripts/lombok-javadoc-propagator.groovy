@@ -59,116 +59,122 @@ class LombokJavadocPropagator {
         return false
     }
 
-    // Patches delombok builder output: class Javadoc, build() Javadoc, setter Javadoc.
+    // ─── @Builder Javadoc injection helpers ──────────────────────────────────────
+
+    // Injects /** ... */ unless one already precedes; always re-parks trailing annotations.
+    private void injectJavadocIfMissing(List<String> result, String indent, List<String> bodyLines) {
+        def annotations = collectPrecedingAnnotations(result)
+        if (!hasPrecedingJavadoc(result)) {
+            result << "${indent}/**"
+            bodyLines.each { result << (it.isEmpty() ? "${indent} *" : "${indent} * ${it}") }
+            result << "${indent} */"
+        }
+        result.addAll(annotations)
+    }
+
+    private void injectBuilderClassJavadoc(List<String> result, String indent, String outerClassName) {
+        if (!hasPrecedingJavadoc(result)) {
+            def annotations = collectPrecedingAnnotations(result)
+            result << "${indent}/**"
+            result << "${indent} * Builder class for {@link ${outerClassName}}."
+            result << "${indent} */"
+            result.addAll(annotations)
+        }
+    }
+
+    private void injectBuildMethodJavadoc(List<String> result, String indent, String outerClassName) {
+        injectJavadocIfMissing(result, indent, [
+            "Builds and returns a new {@link ${outerClassName}} instance.",
+            "@return new {@link ${outerClassName}} instance; never {@code null}"
+        ])
+    }
+
+    private void injectBuilderToStringJavadoc(List<String> result, String indent, String outerClassName) {
+        injectJavadocIfMissing(result, indent, [
+            "Returns a string representation of the current ${outerClassName}Builder state.",
+            "Shows all field values set so far; useful for debugging.",
+            "",
+            "@return string representation of this builder; never {@code null}"
+        ])
+    }
+
+    private void injectBuilderFactoryJavadoc(List<String> result, String indent, String outerClassName) {
+        injectJavadocIfMissing(result, indent, [
+            "Creates a new {@link ${outerClassName}Builder} to build a {@link ${outerClassName}} instance.",
+            "",
+            "@return a new {@link ${outerClassName}Builder}; never {@code null}"
+        ])
+    }
+
+    private void injectBuilderSetterJavadoc(List<String> result, String indent,
+                                             String fieldName, Map getterReturns, Map overrides) {
+        def override    = overrides[fieldName]
+        def annotations = collectPrecedingAnnotations(result)
+        if (override != null) {
+            if (result && result.last().trim() == '*/') {
+                while (result && !result.last().trim().startsWith('/**')) result.removeLast()
+                if (result) result.removeLast()
+            }
+            result << "${indent}/**"
+            override.split('\n').each { result << "${indent} * ${it}" }
+            result << "${indent} */"
+        } else {
+            def returnText = getterReturns[fieldName] ?: ''
+            int limit = Math.max(0, result.size() - 20)
+            for (int j = result.size() - 1; j >= limit; j--) {
+                if (result[j].trim() == '* @return {@code this}.') {
+                    def ind = result[j].replaceFirst(/\S.*/, '')
+                    result[j] = "${ind}* @param ${fieldName} ${returnText}"
+                    result.add(j + 1, "${ind}* @return this builder")
+                    break
+                }
+            }
+        }
+        result.addAll(annotations)
+    }
+
+    // Patches delombok builder output: injects Javadoc on class, build(), toString(), builder(), setters.
     List<String> patchBuilderSetters(List<String> lines,
                                       Map<String, String> getterReturns,
                                       Map<String, String> overrides) {
         def result = []
         def outerClassName = null
-        int builderDepth = 0  // > 0 while inside the XxxBuilder class body
+        int builderDepth = 0
 
         for (int i = 0; i < lines.size(); i++) {
             def line    = lines[i]
             def trimmed = line.trim()
             def indent  = line.replaceFirst(/\S.*/, '')
 
-            // Track depth inside the builder class
-            if (builderDepth > 0) {
+            if (builderDepth > 0)
                 builderDepth += trimmed.count('{') - trimmed.count('}')
-            }
 
-            // ── Builder class declaration ──────────────────────────────
             def classM = (trimmed =~ /^public static class (\w+)Builder\s*\{/)
             if (classM) {
-                outerClassName = classM[0][1]
-                builderDepth = 1
-                if (!hasPrecedingJavadoc(result)) {
-                    def annotations = collectPrecedingAnnotations(result)
-                    result << "${indent}/**"
-                    result << "${indent} * Builder class for {@link ${outerClassName}}."
-                    result << "${indent} */"
-                    result.addAll(annotations)
-                }
-                result << line
-                continue
+                outerClassName = classM[0][1]; builderDepth = 1
+                injectBuilderClassJavadoc(result, indent, outerClassName)
+                result << line; continue
             }
 
-            // ── build() termination method ─────────────────────────────
             if (outerClassName && (trimmed =~ /^public\s+\S+\s+build\s*\(\s*\)\s*\{/)) {
-                def annotations = collectPrecedingAnnotations(result)
-                if (!hasPrecedingJavadoc(result)) {
-                    result << "${indent}/**"
-                    result << "${indent} * Builds and returns a new {@link ${outerClassName}} instance."
-                    result << "${indent} * @return new {@link ${outerClassName}} instance; never {@code null}"
-                    result << "${indent} */"
-                }
-                result.addAll(annotations)
-                result << line
-                continue
+                injectBuildMethodJavadoc(result, indent, outerClassName)
+                result << line; continue
             }
 
-            // ── Builder toString() ────────────────────────────────────
             if (builderDepth > 0 && outerClassName &&
                 (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
-                def annotations = collectPrecedingAnnotations(result)
-                if (!hasPrecedingJavadoc(result)) {
-                    result << "${indent}/**"
-                    result << "${indent} * Returns a string representation of the current ${outerClassName}Builder state."
-                    result << "${indent} * Shows all field values set so far; useful for debugging."
-                    result << "${indent} *"
-                    result << "${indent} * @return string representation of this builder; never {@code null}"
-                    result << "${indent} */"
-                }
-                result.addAll(annotations)
-                result << line
-                continue
+                injectBuilderToStringJavadoc(result, indent, outerClassName)
+                result << line; continue
             }
 
-            // ── builder() static factory ──────────────────────────────
             if (outerClassName && (trimmed =~ /^public\s+static\s+\S+\s+builder\s*\(\s*\)\s*\{/)) {
-                def annotations = collectPrecedingAnnotations(result)
-                if (!hasPrecedingJavadoc(result)) {
-                    result << "${indent}/**"
-                    result << "${indent} * Creates a new {@link ${outerClassName}Builder} to build a {@link ${outerClassName}} instance."
-                    result << "${indent} *"
-                    result << "${indent} * @return a new {@link ${outerClassName}Builder}; never {@code null}"
-                    result << "${indent} */"
-                }
-                result.addAll(annotations)
-                result << line
-                continue
+                injectBuilderFactoryJavadoc(result, indent, outerClassName)
+                result << line; continue
             }
 
-            // ── Builder setter methods ─────────────────────────────────
             def m = (trimmed =~ /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/)
-            if (m && m[0][1] == m[0][2]) {
-                def fieldName = m[0][1]
-                def override  = overrides[fieldName]
-                def annotations = collectPrecedingAnnotations(result)
-
-                if (override != null) {
-                    if (result && result.last().trim() == '*/') {
-                        while (result && !result.last().trim().startsWith('/**')) result.removeLast()
-                        if (result) result.removeLast()
-                    }
-                    result << "${indent}/**"
-                    override.split('\n').each { result << "${indent} * ${it}" }
-                    result << "${indent} */"
-                } else {
-                    def returnText = getterReturns[fieldName] ?: ''
-                    int limit = Math.max(0, result.size() - 20)
-                    for (int j = result.size() - 1; j >= limit; j--) {
-                        if (result[j].trim() == '* @return {@code this}.') {
-                            def ind = result[j].replaceFirst(/\S.*/, '')
-                            result[j] = "${ind}* @param ${fieldName} ${returnText}"
-                            result.add(j + 1, "${ind}* @return this builder")
-                            break
-                        }
-                    }
-                }
-
-                result.addAll(annotations)
-            }
+            if (m && m[0][1] == m[0][2])
+                injectBuilderSetterJavadoc(result, indent, m[0][1], getterReturns, overrides)
 
             result << line
         }
