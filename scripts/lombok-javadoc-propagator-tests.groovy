@@ -5,7 +5,10 @@ import groovy.transform.Field
 
 def thisDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
 def gcl = new GroovyClassLoader(getClass().classLoader)
-gcl.parseClass(new File(thisDir, 'lombok-javadoc-propagator.groovy'))
+['source-analyzer', 'javadoc-utils', 'builder-javadoc-patcher',
+ 'equals-hashcode-javadoc-patcher', 'lombok-javadoc-propagator'].each { name ->
+    gcl.parseClass(new File(thisDir, "${name}.groovy"))
+}
 p = gcl.loadClass('LombokJavadocPropagator').newInstance()
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────

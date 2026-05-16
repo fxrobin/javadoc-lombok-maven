@@ -98,6 +98,10 @@
                                 </goals>
                                 <configuration>
                                     <scripts>
+                                        <script>${project.basedir}/scripts/source-analyzer.groovy</script>
+                                        <script>${project.basedir}/scripts/javadoc-utils.groovy</script>
+                                        <script>${project.basedir}/scripts/builder-javadoc-patcher.groovy</script>
+                                        <script>${project.basedir}/scripts/equals-hashcode-javadoc-patcher.groovy</script>
                                         <script>${project.basedir}/scripts/lombok-javadoc-propagator.groovy</script>
                                     </scripts>
                                 </configuration>
