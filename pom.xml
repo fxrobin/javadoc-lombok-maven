@@ -88,6 +88,12 @@
                                 <version>5.0.0</version>
                                 <scope>runtime</scope>
                             </dependency>
+                            <dependency>
+                                <groupId>org.apache.groovy</groupId>
+                                <artifactId>groovy-ant</artifactId>
+                                <version>5.0.0</version>
+                                <scope>runtime</scope>
+                            </dependency>
                         </dependencies>
                         <executions>
                             <execution>
