@@ -477,65 +477,57 @@ class LombokJavadocPropagator {
         return result
     }
 
-    // Replaces existing toString/equals <p> paragraphs in the class Javadoc
-    // and injects computed ones derived from annotation params.
-    List<String> patchClassJavadoc(List<String> lines,
-                                    List<String> tsFields, Map tsParams,
-                                    List<String> eqFields, Map eqParams,
-                                    String className) {
-        // Find the public class declaration (first, not nested)
-        int classIdx = -1
+    private int findClassDeclarationIndex(List<String> lines, String className) {
         int depth = 0
         for (int i = 0; i < lines.size(); i++) {
             depth += lines[i].trim().count('{') - lines[i].trim().count('}')
-            if (depth == 1 && lines[i] =~ /^\s*public\s+(?:(?:final|abstract)\s+)?class\s+${className}\b/) {
-                classIdx = i; break
-            }
+            if (depth == 1 && lines[i] =~ /^\s*public\s+(?:(?:final|abstract)\s+)?class\s+${className}\b/)
+                return i
         }
-        if (classIdx < 0) return lines
+        return -1
+    }
 
-        // Find preceding */
-        int javadocEnd = -1
+    // Returns [start, end] indices of the /** ... */ block preceding classIdx, or null if absent.
+    private List<Integer> findClassJavadocBounds(List<String> lines, int classIdx) {
+        int end = -1
         for (int i = classIdx - 1; i >= 0; i--) {
             def t = lines[i].trim()
             if (t.isEmpty() || t.startsWith('@')) continue
-            if (t == '*/') { javadocEnd = i; break }
+            if (t == '*/') { end = i; break }
             break
         }
-        if (javadocEnd < 0) return lines
-
-        // Find /**
-        int javadocStart = -1
-        for (int i = javadocEnd - 1; i >= 0; i--) {
-            if (lines[i].trim().startsWith('/**')) { javadocStart = i; break }
+        if (end < 0) return null
+        int start = -1
+        for (int i = end - 1; i >= 0; i--) {
+            if (lines[i].trim().startsWith('/**')) { start = i; break }
             if (!lines[i].trim().startsWith('*')) break
         }
-        if (javadocStart < 0) return lines
+        return start < 0 ? null : [start, end]
+    }
 
-        def indent       = lines[javadocStart].replaceFirst(/\S.*/, '')
-        def javadocLines = new ArrayList<>(lines[javadocStart..javadocEnd])
-
-        // Remove existing computed paragraphs about toString and equals/hashCode
+    private List<String> removeStaleClassJavadocParagraphs(List<String> javadocLines) {
         javadocLines = removeParagraphsMatching(javadocLines) { line ->
             def lower = line.toLowerCase()
             lower.contains('tostring') || lower.contains('#tostring')
         }
-        javadocLines = removeParagraphsMatching(javadocLines) { line ->
+        return removeParagraphsMatching(javadocLines) { line ->
             def lower = line.toLowerCase()
             lower.contains('equality') || lower.contains('hash-code') ||
-            lower.contains('hashcode') ||
-            (lower.contains('equal') && lower.contains('based'))
+            lower.contains('hashcode') || (lower.contains('equal') && lower.contains('based'))
         }
+    }
 
-        // Build replacement paragraphs
-        def newParas = []
+    private List<String> buildClassLevelParagraphs(String indent,
+                                                    List<String> eqFields, Map eqParams,
+                                                    List<String> tsFields, Map tsParams) {
+        def paras = []
         if (eqParams != null && eqFields) {
             def refs = eqFields.collect { "{@code ${it}}" }
             def text = eqFields.size() == 1
                 ? "Equality and hash code based solely on ${refs[0]}."
                 : "Equality and hash code based on: ${refs.join(', ')}."
             if (eqParams.callSuper) text += " Includes superclass fields."
-            newParas << "${indent} * <p>${text}</p>"
+            paras << "${indent} * <p>${text}</p>"
         }
         if (tsParams != null && tsFields) {
             def refs = tsFields.collect { "{@code ${it}}" }.join(', ')
@@ -543,31 +535,50 @@ class LombokJavadocPropagator {
                 ? "{@link #toString()} includes: ${refs}."
                 : "{@link #toString()} includes values of: ${refs} (no field names)."
             if (tsParams.callSuper) text += " Includes fields from superclass."
-            newParas << "${indent} * <p>${text}</p>"
+            paras << "${indent} * <p>${text}</p>"
         }
+        return paras
+    }
 
-        // Collapse consecutive blank (* only) lines left by removed paragraphs
+    private List<String> insertParagraphsIntoJavadoc(List<String> javadocLines,
+                                                      List<String> newParas, String indent) {
+        int insertIdx = javadocLines.size() - 1
+        boolean inPre = false
+        for (int i = 1; i < javadocLines.size() - 1; i++) {
+            def t = javadocLines[i].trim()
+            if (t.contains('<pre>'))  inPre = true
+            if (t.contains('</pre>')) inPre = false
+            if (!inPre && t =~ /^\*\s*@/) { insertIdx = i; break }
+        }
+        if (javadocLines[insertIdx - 1].trim() != '*') javadocLines.add(insertIdx++, "${indent} *")
+        newParas.eachWithIndex { para, idx -> javadocLines.add(insertIdx + idx, para) }
+        insertIdx += newParas.size()
+        if (javadocLines[insertIdx].trim() != '*' && javadocLines[insertIdx].trim() != '*/')
+            javadocLines.add(insertIdx, "${indent} *")
+        return javadocLines
+    }
+
+    // Replaces stale toString/equals <p> paragraphs in the class Javadoc and injects fresh ones.
+    List<String> patchClassJavadoc(List<String> lines,
+                                    List<String> tsFields, Map tsParams,
+                                    List<String> eqFields, Map eqParams,
+                                    String className) {
+        int classIdx = findClassDeclarationIndex(lines, className)
+        if (classIdx < 0) return lines
+
+        def bounds = findClassJavadocBounds(lines, classIdx)
+        if (bounds == null) return lines
+
+        def (javadocStart, javadocEnd) = bounds
+        def indent       = lines[javadocStart].replaceFirst(/\S.*/, '')
+        def javadocLines = new ArrayList<>(lines[javadocStart..javadocEnd])
+
+        javadocLines = removeStaleClassJavadocParagraphs(javadocLines)
         javadocLines = collapseBlankJavadocLines(javadocLines)
 
-        if (newParas) {
-            // Insert before the first @-tag line (not inside a <pre> block)
-            int insertIdx = javadocLines.size() - 1  // default: before */
-            boolean inPre = false
-            for (int i = 1; i < javadocLines.size() - 1; i++) {
-                def t = javadocLines[i].trim()
-                if (t.contains('<pre>'))  inPre = true
-                if (t.contains('</pre>')) inPre = false
-                if (!inPre && t =~ /^\*\s*@/) { insertIdx = i; break }
-            }
-            // Ensure blank line before new paragraphs
-            def prev = javadocLines[insertIdx - 1].trim()
-            if (prev != '*') javadocLines.add(insertIdx++, "${indent} *")
-            newParas.eachWithIndex { para, idx -> javadocLines.add(insertIdx + idx, para) }
-            insertIdx += newParas.size()
-            // Ensure blank line after new paragraphs
-            def next = javadocLines[insertIdx].trim()
-            if (next != '*' && next != '*/') javadocLines.add(insertIdx, "${indent} *")
-        }
+        def newParas = buildClassLevelParagraphs(indent, eqFields, eqParams, tsFields, tsParams)
+        if (newParas)
+            javadocLines = insertParagraphsIntoJavadoc(javadocLines, newParas, indent)
 
         def out = []
         out.addAll(lines[0..<javadocStart])
