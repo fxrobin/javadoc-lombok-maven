@@ -38,30 +38,30 @@ class JavadocUtils extends SourceAnalyzer {
         int i = 0
         while (i < javadocLines.size()) {
             def line = javadocLines[i]
-            def t    = line.trim()
-            if (t =~ PARA_OPEN) {
-                def paraLines = [line]
-                boolean matches = predicate.call(line)
-                if (t =~ PARA_CLOSE) {
-                    if (!matches) result << line
-                    i++
-                    continue
-                }
-                i++
-                while (i < javadocLines.size()) {
-                    def nl = javadocLines[i]
-                    paraLines << nl
-                    if (predicate.call(nl)) matches = true
-                    i++
-                    if (nl.trim() =~ PARA_CLOSE) break
-                }
-                if (!matches) result.addAll(paraLines)
-                continue
-            }
-            result << line
-            i++
+            if (!(line.trim() =~ PARA_OPEN)) { result << line; i++; continue }
+            def para = collectParagraph(javadocLines, i, predicate)
+            if (!para.matches) result.addAll(para.lines)
+            i = para.nextIdx
         }
         return result
+    }
+
+    private Map collectParagraph(List<String> javadocLines, int startIdx, Closure<Boolean> predicate) {
+        def line = javadocLines[startIdx]
+        def t    = line.trim()
+        if (t =~ PARA_CLOSE)
+            return [lines: [line], matches: predicate.call(line), nextIdx: startIdx + 1]
+        def paraLines = [line]
+        boolean matches = predicate.call(line)
+        int i = startIdx + 1
+        while (i < javadocLines.size()) {
+            def nl = javadocLines[i]
+            paraLines << nl
+            if (predicate.call(nl)) matches = true
+            i++
+            if (nl.trim() =~ PARA_CLOSE) break
+        }
+        return [lines: paraLines, matches: matches, nextIdx: i]
     }
 
     // Collapses runs of blank (* only) lines in a Javadoc block to at most one.

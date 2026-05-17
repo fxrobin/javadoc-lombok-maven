@@ -8,14 +8,19 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
 
     // ─── @ToString / @EqualsAndHashCode method Javadoc injection ─────────────
 
+    private String buildToStringFormat(String className, List<String> fields, boolean includeFieldNames) {
+        def inner = includeFieldNames
+            ? fields.collect { field -> "${field}=…" }.join(', ')
+            : fields.collect { _ -> '…' }.join(', ')
+        return "${className}(${inner})"
+    }
+
     private void injectToStringJavadoc(List<String> result, String indent,
                                         String className, List<String> fields, Map params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
         def fieldRefs   = fields.collect { field -> "{@code ${field}}" }.join(', ')
-        def format      = params.includeFieldNames
-            ? "${className}(" + fields.collect { field -> "${field}=…" }.join(', ') + ")"
-            : "${className}(" + fields.collect { _ -> '…' }.join(', ') + ")"
+        def format      = buildToStringFormat(className, fields, params.includeFieldNames)
         result << "${indent}/**"
         result << "${indent} * Returns a string representation of this instance."
         result << "${indent} * Includes: ${fieldRefs}."
@@ -30,27 +35,35 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
         result.addAll(annotations)
     }
 
+    private List<String> buildEqualsDescription(String indent, List<String> fields, List<String> fieldRefs, Map params) {
+        def lines = []
+        if (fields.size() == 1)
+            lines << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
+        else {
+            lines << "${indent} * Two instances are equal when all these fields are equal:"
+            lines << "${indent} * ${fieldRefs.join(', ')}."
+        }
+        if (params.callSuper)
+            lines << "${indent} * Includes fields from superclass."
+        return lines
+    }
+
+    private String buildEqualsReturnLine(String indent, List<String> fields, List<String> fieldRefs) {
+        if (fields.size() == 1)
+            return "${indent} * @return {@code true} if ${fieldRefs[0]} is equal; {@code false} otherwise"
+        return "${indent} * @return {@code true} when all fields match; {@code false} otherwise"
+    }
+
     private void injectEqualsJavadoc(List<String> result, String indent,
                                       List<String> fields, Map params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
         def fieldRefs   = fields.collect { field -> "{@code ${field}}" }
         result << "${indent}/**"
-        if (fields.size() == 1) {
-            result << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
-        } else {
-            result << "${indent} * Two instances are equal when all these fields are equal:"
-            result << "${indent} * ${fieldRefs.join(', ')}."
-        }
-        if (params.callSuper)
-            result << "${indent} * Includes fields from superclass."
+        result.addAll(buildEqualsDescription(indent, fields, fieldRefs, params))
         result << "${indent} *"
         result << "${indent} * @param o the object to compare with; may be {@code null}"
-        if (fields.size() == 1) {
-            result << "${indent} * @return {@code true} if ${fieldRefs[0]} is equal; {@code false} otherwise"
-        } else {
-            result << "${indent} * @return {@code true} when all fields match; {@code false} otherwise"
-        }
+        result << buildEqualsReturnLine(indent, fields, fieldRefs)
         result << "${indent} */"
         result.addAll(annotations)
     }
@@ -81,49 +94,45 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
         result.addAll(annotations)
     }
 
+    private boolean dispatchLombokMethodJavadoc(List<String> result, String line, String trimmed,
+                                                String indent, AnnotationContext tsCtx,
+                                                AnnotationContext eqCtx, String className) {
+        if (tsCtx.isPresent() && tsCtx.hasFields() && (trimmed =~ TOSTRING_METHOD)) {
+            injectToStringJavadoc(result, indent, className, tsCtx.fields, tsCtx.params)
+            result << line; return true
+        }
+        if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ EQUALS_METHOD)) {
+            injectEqualsJavadoc(result, indent, eqCtx.fields, eqCtx.params)
+            result << line; return true
+        }
+        if (eqCtx.isPresent() && (trimmed =~ CAN_EQUAL_METHOD)) {
+            injectCanEqualJavadoc(result, indent, className)
+            result << line; return true
+        }
+        if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ HASHCODE_METHOD)) {
+            injectHashCodeJavadoc(result, indent, eqCtx.fields)
+            result << line; return true
+        }
+        return false
+    }
+
     // Injects Javadoc on toString(), equals(), canEqual(), hashCode() at outer class level only.
     // Uses brace-depth tracking to skip methods inside nested classes (e.g. XxxBuilder).
     List<String> patchToStringEqualsHashCode(List<String> lines,
                                               AnnotationContext tsCtx,
                                               AnnotationContext eqCtx,
                                               String className) {
-        def result    = []
+        def result     = []
         int braceDepth = 0
-
         for (int i = 0; i < lines.size(); i++) {
             def line    = lines[i]
             def trimmed = line.trim()
             def indent  = line.replaceFirst(/\S.*/, '')
-
             int lineStartDepth = braceDepth
             braceDepth += trimmed.count('{') - trimmed.count('}')
-
-            if (lineStartDepth == 1) {
-                if (tsCtx.isPresent() && tsCtx.hasFields() && (trimmed =~ TOSTRING_METHOD)) {
-                    injectToStringJavadoc(result, indent, className, tsCtx.fields, tsCtx.params)
-                    result << line
-                    continue
-                }
-
-                if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ EQUALS_METHOD)) {
-                    injectEqualsJavadoc(result, indent, eqCtx.fields, eqCtx.params)
-                    result << line
-                    continue
-                }
-
-                if (eqCtx.isPresent() && (trimmed =~ CAN_EQUAL_METHOD)) {
-                    injectCanEqualJavadoc(result, indent, className)
-                    result << line
-                    continue
-                }
-
-                if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ HASHCODE_METHOD)) {
-                    injectHashCodeJavadoc(result, indent, eqCtx.fields)
-                    result << line
-                    continue
-                }
-            }
-
+            if (lineStartDepth == 1 &&
+                dispatchLombokMethodJavadoc(result, line, trimmed, indent, tsCtx, eqCtx, className))
+                continue
             result << line
         }
         return result
