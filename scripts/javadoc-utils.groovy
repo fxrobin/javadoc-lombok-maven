@@ -46,7 +46,7 @@ class JavadocUtils extends SourceAnalyzer {
         return result
     }
 
-    private Map collectParagraph(List<String> javadocLines, int startIdx, Closure<Boolean> predicate) {
+    private Map<String, Object> collectParagraph(List<String> javadocLines, int startIdx, Closure<Boolean> predicate) {
         def line = javadocLines[startIdx]
         def t    = line.trim()
         if (t =~ PARA_CLOSE)

@@ -63,7 +63,8 @@ class BuilderJavadocPatcher extends JavadocUtils {
     }
 
     private void injectBuilderSetterJavadoc(List<String> result, String indent,
-                                             String fieldName, Map getterReturns, Map overrides) {
+                                             String fieldName, Map<String, String> getterReturns,
+                                             Map<String, String> overrides) {
         def override    = overrides[fieldName]
         def annotations = collectPrecedingAnnotations(result)
         if (override != null)
@@ -74,8 +75,9 @@ class BuilderJavadocPatcher extends JavadocUtils {
     }
 
     private boolean dispatchBuilderMemberJavadoc(List<String> result, String line, String trimmed,
-                                                  String indent, Map state,
-                                                  Map getterReturns, Map overrides) {
+                                                  String indent, Map<String, Object> state,
+                                                  Map<String, String> getterReturns,
+                                                  Map<String, String> overrides) {
         if (trimmed =~ BUILD_METHOD) {
             injectBuildMethodJavadoc(result, indent, state.outerClassName)
             result << line; return true
@@ -95,8 +97,9 @@ class BuilderJavadocPatcher extends JavadocUtils {
     }
 
     private boolean dispatchBuilderLineJavadoc(List<String> result, String line, String trimmed,
-                                                String indent, Map state,
-                                                Map getterReturns, Map overrides) {
+                                                String indent, Map<String, Object> state,
+                                                Map<String, String> getterReturns,
+                                                Map<String, String> overrides) {
         def classM = (trimmed =~ BUILDER_CLASS_DECL)
         if (classM) {
             state.outerClassName = classM[0][1]

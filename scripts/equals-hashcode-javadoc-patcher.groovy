@@ -16,7 +16,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
     }
 
     private void injectToStringJavadoc(List<String> result, String indent,
-                                        String className, List<String> fields, Map params) {
+                                        String className, List<String> fields, Map<String, Object> params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
         def fieldRefs   = fields.collect { field -> "{@code ${field}}" }.join(', ')
@@ -35,7 +35,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
         result.addAll(annotations)
     }
 
-    private List<String> buildEqualsDescription(String indent, List<String> fields, List<String> fieldRefs, Map params) {
+    private List<String> buildEqualsDescription(String indent, List<String> fields, List<String> fieldRefs, Map<String, Object> params) {
         def lines = []
         if (fields.size() == 1)
             lines << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
@@ -55,7 +55,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
     }
 
     private void injectEqualsJavadoc(List<String> result, String indent,
-                                      List<String> fields, Map params) {
+                                      List<String> fields, Map<String, Object> params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
         def fieldRefs   = fields.collect { field -> "{@code ${field}}" }

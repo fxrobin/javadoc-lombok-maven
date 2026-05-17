@@ -101,7 +101,7 @@ class SourceAnalyzer {
     }
 
     // Returns null if @ToString is absent; otherwise a map of params.
-    Map parseToStringParams(List<String> lines) {
+    Map<String, Object> parseToStringParams(List<String> lines) {
         def ann = findAnnotationLine(lines, 'ToString')
         if (!ann) return null
         return [
@@ -114,7 +114,7 @@ class SourceAnalyzer {
     }
 
     // Returns null if @EqualsAndHashCode is absent; otherwise a map of params.
-    Map parseEqualsHashCodeParams(List<String> lines) {
+    Map<String, Object> parseEqualsHashCodeParams(List<String> lines) {
         def ann = findAnnotationLine(lines, 'EqualsAndHashCode')
         if (!ann) return null
         return [
@@ -138,7 +138,7 @@ class SourceAnalyzer {
 
     // annotationType: 'ToString' or 'EqualsAndHashCode'
     // Returns [excludes: [...], includes: [...]] from field-level annotations.
-    Map extractFieldLevelAnnotations(List<String> lines, String annotationType) {
+    Map<String, List<String>> extractFieldLevelAnnotations(List<String> lines, String annotationType) {
         def excludes = []; def includes = []
         for (int i = 0; i < lines.size(); i++) {
             def t = lines[i].trim()
@@ -159,7 +159,7 @@ class SourceAnalyzer {
         return [excludes: excludes, includes: includes]
     }
 
-    List<String> computeEffectiveFields(Map params, Map fieldAnns, List<String> allFields) {
+    List<String> computeEffectiveFields(Map<String, Object> params, Map<String, List<String>> fieldAnns, List<String> allFields) {
         if (!params.of.isEmpty())    return new ArrayList<>(params.of)
         if (params.onlyExplicit)     return new ArrayList<>(fieldAnns.includes)
         def result = new ArrayList<>(allFields)
