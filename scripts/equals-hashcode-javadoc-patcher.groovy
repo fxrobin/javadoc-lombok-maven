@@ -219,6 +219,15 @@ class EqualsHashCodeJavadocPatcher implements JavadocUtils {
         return javadocLines
     }
 
+    private List<String> reassembleWithJavadoc(List<String> lines, List<String> javadocLines,
+                                                int javadocStart, int javadocEnd) {
+        def out = []
+        out.addAll(lines[0..<javadocStart])
+        out.addAll(javadocLines)
+        out.addAll(lines[(javadocEnd + 1)..<lines.size()])
+        return out
+    }
+
     // Replaces stale toString/equals <p> paragraphs in the class Javadoc and injects fresh ones.
     List<String> patchClassJavadoc(List<String> lines,
                                     AnnotationContext tsCtx,
@@ -226,26 +235,17 @@ class EqualsHashCodeJavadocPatcher implements JavadocUtils {
                                     String className) {
         int classIdx = findClassDeclarationIndex(lines, className)
         if (classIdx < 0) return lines
-
         def bounds = findClassJavadocBounds(lines, classIdx)
         if (bounds == null) return lines
-
         def (javadocStart, javadocEnd) = bounds
         def indent       = lines[javadocStart].replaceFirst(/\S.*/, '')
         def javadocLines = new ArrayList<>(lines[javadocStart..javadocEnd])
-
         javadocLines = removeStaleClassJavadocParagraphs(javadocLines)
         javadocLines = collapseBlankJavadocLines(javadocLines)
-
         def newParas = buildClassLevelParagraphs(indent, tsCtx, eqCtx)
         if (newParas)
             javadocLines = insertParagraphsIntoJavadoc(javadocLines, newParas, indent)
-
-        def out = []
-        out.addAll(lines[0..<javadocStart])
-        out.addAll(javadocLines)
-        out.addAll(lines[(javadocEnd + 1)..<lines.size()])
-        return out
+        return reassembleWithJavadoc(lines, javadocLines, javadocStart, javadocEnd)
     }
 }
 

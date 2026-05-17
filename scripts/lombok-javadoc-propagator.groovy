@@ -19,46 +19,48 @@ class LombokJavadocPropagator implements SourceAnalyzer, JavadocUtils {
 
     // ─── Entry point ──────────────────────────────────────────────────────────
 
-    void processFile(File delombokFile, File delombokBaseDir, File sourceBaseDir) {
-        def relPath     = delombokBaseDir.toPath().relativize(delombokFile.toPath()).toString()
-        def sourceFile  = new File(sourceBaseDir, relPath)
-        def sourceLines = sourceFile.exists() ? sourceFile.readLines('UTF-8') : []
+    private List<String> applyBuilderPatching(List<String> lines, List<String> sourceLines) {
+        def getterReturns = extractGetterReturns(lines)
+        def overrides     = extractBuilderParamOverrides(sourceLines)
+        return builderPatcher.patchBuilderSetters(lines, getterReturns, overrides)
+    }
 
-        def tsParams  = parseToStringParams(sourceLines)
-        def eqParams  = parseEqualsHashCodeParams(sourceLines)
-        boolean hasBuilder  = hasBuilderAnnotation(sourceLines)
-        boolean hasToString = tsParams != null
-        boolean hasEqHash   = eqParams != null
+    private List<String> applyEqualsHashCodePatching(List<String> lines, List<String> sourceLines,
+                                                      Map<String, Object> tsParams,
+                                                      Map<String, Object> eqParams) {
+        def allFields   = extractAllFieldNames(sourceLines)
+        def tsFieldAnns = extractFieldLevelAnnotations(sourceLines, 'ToString')
+        def eqFieldAnns = extractFieldLevelAnnotations(sourceLines, 'EqualsAndHashCode')
+        def tsCtx       = tsParams ? AnnotationContext.of(computeEffectiveFields(tsParams, tsFieldAnns, allFields), tsParams)
+                                   : AnnotationContext.absent()
+        def eqCtx       = eqParams ? AnnotationContext.of(computeEffectiveFields(eqParams, eqFieldAnns, allFields), eqParams)
+                                   : AnnotationContext.absent()
+        def className   = extractClassName(lines)
+        lines = eqPatcher.patchToStringEqualsHashCode(lines, tsCtx, eqCtx, className)
+        return eqPatcher.patchClassJavadoc(lines, tsCtx, eqCtx, className)
+    }
 
-        if (!hasBuilder && !hasToString && !hasEqHash) return
-
-        def patched = delombokFile.readLines('UTF-8')
-
-        if (hasBuilder) {
-            def getterReturns = extractGetterReturns(patched)
-            def overrides     = extractBuilderParamOverrides(sourceLines)
-            patched = builderPatcher.patchBuilderSetters(patched, getterReturns, overrides)
-        }
-
-        if (hasToString || hasEqHash) {
-            def allFields   = extractAllFieldNames(sourceLines)
-            def tsFieldAnns = extractFieldLevelAnnotations(sourceLines, 'ToString')
-            def eqFieldAnns = extractFieldLevelAnnotations(sourceLines, 'EqualsAndHashCode')
-            def tsCtx       = tsParams ? AnnotationContext.of(computeEffectiveFields(tsParams, tsFieldAnns, allFields), tsParams)
-                                       : AnnotationContext.absent()
-            def eqCtx       = eqParams ? AnnotationContext.of(computeEffectiveFields(eqParams, eqFieldAnns, allFields), eqParams)
-                                       : AnnotationContext.absent()
-            def className   = extractClassName(patched)
-
-            patched = eqPatcher.patchToStringEqualsHashCode(patched, tsCtx, eqCtx, className)
-            patched = eqPatcher.patchClassJavadoc(patched, tsCtx, eqCtx, className)
-        }
-
-        delombokFile.write(patched.join('\n') + '\n', 'UTF-8')
+    private void logPatched(File delombokFile, boolean hasBuilder, boolean hasToString, boolean hasEqHash) {
         def tags = [hasBuilder ? "@Builder" : null,
                     hasToString ? "@ToString" : null,
                     hasEqHash ? "@EqualsAndHashCode" : null].findAll { tag -> tag != null }.join(', ')
         println "  Patched: ${delombokFile.name} [${tags}]"
+    }
+
+    void processFile(File delombokFile, File delombokBaseDir, File sourceBaseDir) {
+        def sourceLines = new File(sourceBaseDir, delombokBaseDir.toPath().relativize(delombokFile.toPath()).toString())
+                              .with { f -> f.exists() ? f.readLines('UTF-8') : [] }
+        def tsParams        = parseToStringParams(sourceLines)
+        def eqParams        = parseEqualsHashCodeParams(sourceLines)
+        boolean hasBuilder  = hasBuilderAnnotation(sourceLines)
+        boolean hasToString = tsParams != null
+        boolean hasEqHash   = eqParams != null
+        if (!hasBuilder && !hasToString && !hasEqHash) return
+        def patched = delombokFile.readLines('UTF-8')
+        if (hasBuilder)            patched = applyBuilderPatching(patched, sourceLines)
+        if (hasToString || hasEqHash) patched = applyEqualsHashCodePatching(patched, sourceLines, tsParams, eqParams)
+        delombokFile.write(patched.join('\n') + '\n', 'UTF-8')
+        logPatched(delombokFile, hasBuilder, hasToString, hasEqHash)
     }
 }
 

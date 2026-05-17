@@ -139,7 +139,8 @@ trait SourceAnalyzer {
     // annotationType: 'ToString' or 'EqualsAndHashCode'
     // Returns [excludes: [...], includes: [...]] from field-level annotations.
     Map<String, List<String>> extractFieldLevelAnnotations(List<String> lines, String annotationType) {
-        def excludes = []; def includes = []
+        def excludes = []
+        def includes = []
         for (int i = 0; i < lines.size(); i++) {
             def t = lines[i].trim()
             boolean isExclude = t =~ /^@(?:lombok\.)?${annotationType}\.Exclude\b/

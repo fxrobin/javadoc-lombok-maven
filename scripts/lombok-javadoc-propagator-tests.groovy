@@ -271,8 +271,8 @@ def testRemoveParagraphsMatching() {
         ' */',
     ]
     def cleaned = p.removeParagraphsMatching(javadoc) { line -> line.toLowerCase().contains('equality') }
-    assert !cleaned.any { it.contains('Equality') }, "Should remove equality para"
-    assert cleaned.any { it.contains('Other paragraph') }, "Should keep other para"
+    assert !cleaned.any { line -> line.contains('Equality') }, "Should remove equality para"
+    assert cleaned.any { line -> line.contains('Other paragraph') }, "Should keep other para"
 }
 
 // ─── Run all tests ────────────────────────────────────────────────────────────
