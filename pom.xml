@@ -16,6 +16,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lombok.version>1.18.46</lombok.version>
+        <skipJavadocEnhancement>false</skipJavadocEnhancement>
     </properties>
 
     <dependencies>
@@ -103,6 +104,7 @@
                                     <goal>execute</goal>
                                 </goals>
                                 <configuration>
+                                    <skipScriptExecution>${skipJavadocEnhancement}</skipScriptExecution>
                                     <scripts>
                                         <script>${project.basedir}/scripts/source-analyzer.groovy</script>
                                         <script>${project.basedir}/scripts/javadoc-utils.groovy</script>
@@ -123,6 +125,7 @@
                             <!-- Suppress "missing" doclint category for Lombok-generated methods
                                  (builder setter @param and build() comment are not controllable from source) -->
                             <doclint>all,-missing</doclint>
+                            <stylesheetfile>src/main/javadoc/javadoc-black-theme.css</stylesheetfile>
                             <additionalOptions>
                                 <additionalOption>-tag "apiNote:a:API Note:"</additionalOption>
                                 <additionalOption>-tag "implSpec:a:Implementation Requirements:"</additionalOption>
