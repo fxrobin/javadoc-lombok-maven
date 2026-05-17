@@ -1,8 +1,8 @@
 // Run from project root: groovy scripts/lombok-javadoc-propagator-tests.groovy
 import groovy.transform.Field
 
-@Field def p   // initialized below after classloader setup
-@Field def AC  // AnnotationContext class, loaded from gcl
+@Field def p   // LombokJavadocPropagator - initialized below after classloader setup
+@Field def AC  // Class<AnnotationContext> - loaded from gcl
 
 def thisDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
 def gcl = new GroovyClassLoader(getClass().classLoader)

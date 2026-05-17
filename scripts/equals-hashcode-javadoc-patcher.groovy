@@ -201,8 +201,7 @@ class EqualsHashCodeJavadocPatcher implements JavadocUtils {
         return paras
     }
 
-    private List<String> insertParagraphsIntoJavadoc(List<String> javadocLines,
-                                                      List<String> newParas, String indent) {
+    private int findInsertionIndexForParagraphs(List<String> javadocLines) {
         int insertIdx = javadocLines.size() - 1
         boolean inPre = false
         for (int i = 1; i < javadocLines.size() - 1; i++) {
@@ -211,10 +210,25 @@ class EqualsHashCodeJavadocPatcher implements JavadocUtils {
             if (t.contains('</pre>')) inPre = false
             if (!inPre && t =~ JAVADOC_TAG_LINE) { insertIdx = i; break }
         }
-        if (javadocLines[insertIdx - 1].trim() != '*') javadocLines.add(insertIdx++, "${indent} *")
+        return insertIdx
+    }
+
+    private boolean needsBlankJavadocLineBefore(List<String> lines, int idx, String indent) {
+        return idx >= 0 && idx < lines.size() && lines[idx].trim() != '*'
+    }
+
+    private boolean needsBlankJavadocLineAfter(List<String> lines, int idx) {
+        return idx >= 0 && idx < lines.size() && lines[idx].trim() != '*' && lines[idx].trim() != '*/'
+    }
+
+    private List<String> insertParagraphsIntoJavadoc(List<String> javadocLines,
+                                                      List<String> newParas, String indent) {
+        int insertIdx = findInsertionIndexForParagraphs(javadocLines)
+        if (needsBlankJavadocLineBefore(javadocLines, insertIdx - 1, indent))
+            javadocLines.add(insertIdx++, "${indent} *")
         newParas.eachWithIndex { para, idx -> javadocLines.add(insertIdx + idx, para) }
         insertIdx += newParas.size()
-        if (javadocLines[insertIdx].trim() != '*' && javadocLines[insertIdx].trim() != '*/')
+        if (needsBlankJavadocLineAfter(javadocLines, insertIdx))
             javadocLines.add(insertIdx, "${indent} *")
         return javadocLines
     }

@@ -14,10 +14,20 @@ class AnnotationContext {
 
 trait SourceAnalyzer {
 
+    // ── Regex Constants ───────────────────────────────────────────────────────
+
+    private static final BUILDER_ANNOTATION  = /^@(lombok\.)?Builder(\(.*\))?$/
+    private static final GETTER_METHOD       = /^public\s+\S+\s+(?:get|is)([A-Z]\w*)\s*\(\)/ 
+    private static final FIELD_DECLARATION    = /^private\s+(?:final\s+)?[\w<>?,\[\]. ]+\s+(\w+)\s*[;=]/
+    private static final NON_STATIC_FIELD_DECL = /^private\s+(?!static\s)(?:final\s+)?[\w<>?,\[\]. ]+\s+(\w+)\s*[;=]/
+    private static final CLASS_DECLARATION     = /^\s*public\s+(?:(?:final|abstract)\s+)?class\s+(\w+)/
+    private static final QUOTED_WORD          = /"(\w+)"/
+    private static final JAVADOC_STAR_PREFIX   = /^\*\s?/
+
     // ─── @Builder helpers ─────────────────────────────────────────────────────
 
     boolean hasBuilderAnnotation(List<String> lines) {
-        lines.any { line -> line.trim() =~ /^@(lombok\.)?Builder(\(.*\))?$/ }
+        lines.any { line -> line.trim() =~ BUILDER_ANNOTATION }
     }
 
     // Extracts @return text from getter methods in delombok output.
@@ -25,12 +35,12 @@ trait SourceAnalyzer {
     Map<String, String> extractGetterReturns(List<String> lines) {
         def result = [:]
         for (int i = 0; i < lines.size(); i++) {
-            def m = (lines[i].trim() =~ /^public\s+\S+\s+(?:get|is)([A-Z]\w*)\s*\(\)/)
+            def m = (lines[i].trim() =~ GETTER_METHOD)
             if (!m) continue
             def raw = m[0][1]
             def fieldName = raw[0].toLowerCase() + (raw.size() > 1 ? raw[1..-1] : '')
             for (int j = i - 1; j >= 0; j--) {
-                def content = lines[j].trim().replaceFirst(/^\*\s?/, '')
+                def content = lines[j].trim().replaceFirst(JAVADOC_STAR_PREFIX, '')
                 if (content.startsWith('@return ')) {
                     result[fieldName] = content.substring('@return '.length()).trim()
                     break
@@ -50,13 +60,13 @@ trait SourceAnalyzer {
             def overrideLines = []
             int j = i + 1
             while (j < lines.size() && lines[j].trim() != '*/') {
-                overrideLines << lines[j].trim().replaceFirst(/^\*\s?/, '')
+                overrideLines << lines[j].trim().replaceFirst(JAVADOC_STAR_PREFIX, '')
                 j++
             }
             int k = j + 1
             while (k < lines.size() && lines[k].trim().startsWith('@')) k++
             if (k < lines.size()) {
-                def fm = (lines[k].trim() =~ /^private\s+(?:final\s+)?[\w<>?,.\[\] ]+\s+(\w+)\s*[;=]/)
+                def fm = (lines[k].trim() =~ FIELD_DECLARATION)
                 if (fm) result[fm[0][1]] = overrideLines.findAll { line -> !line.isEmpty() }.join('\n')
             }
         }
@@ -91,7 +101,7 @@ trait SourceAnalyzer {
         if (m) return [m[0][1]]
         m = ann =~ /\b${param}\s*=\s*\{([^}]*)\}/
         if (!m) return []
-        return (m[0][1] =~ /"(\w+)"/).collect { match -> match[1] }
+        return (m[0][1] =~ QUOTED_WORD).collect { match -> match[1] }
     }
 
     boolean parseBoolParam(String ann, String param, boolean defaultVal = false) {
@@ -130,10 +140,43 @@ trait SourceAnalyzer {
     List<String> extractAllFieldNames(List<String> lines) {
         def result = []
         for (def line : lines) {
-            def m = line.trim() =~ /^private\s+(?!static\s)(?:final\s+)?[\w<>?,\[\]. ]+\s+(\w+)\s*[;=]/
+            def m = line.trim() =~ NON_STATIC_FIELD_DECL
             if (m) result << m[0][1]
         }
         return result
+    }
+
+    // annotationType: 'ToString' or 'EqualsAndHashCode'
+    private boolean isFieldLevelAnnotation(String line, String annotationType) {
+        def t = line.trim()
+        return t =~ /^@(?:lombok\.)?${annotationType}\.Exclude\b/ ||
+               t =~ /^@(?:lombok\.)?${annotationType}\.Include\b/
+    }
+
+    private boolean isExcludeAnnotation(String line, String annotationType) {
+        def t = line.trim()
+        return t =~ /^@(?:lombok\.)?${annotationType}\.Exclude\b/
+    }
+
+    private String extractFieldNameFromDeclaration(String line) {
+        def m = line.trim() =~ FIELD_DECLARATION
+        return m ? m[0][1] : null
+    }
+
+    private static final OPEN_BRACE = /^\{/
+
+    private boolean isClassOrMethodBoundary(String line) {
+        def t = line.trim()
+        return t =~ OPEN_BRACE || t.startsWith('public ') || t.startsWith('protected ')
+    }
+
+    private String findFieldAfterAnnotation(List<String> lines, int startIdx, String annotationType) {
+        for (int j = startIdx; j < lines.size(); j++) {
+            def fieldName = extractFieldNameFromDeclaration(lines[j])
+            if (fieldName) return fieldName
+            if (isClassOrMethodBoundary(lines[j])) break
+        }
+        return null
     }
 
     // annotationType: 'ToString' or 'EqualsAndHashCode'
@@ -142,19 +185,12 @@ trait SourceAnalyzer {
         def excludes = []
         def includes = []
         for (int i = 0; i < lines.size(); i++) {
-            def t = lines[i].trim()
-            boolean isExclude = t =~ /^@(?:lombok\.)?${annotationType}\.Exclude\b/
-            boolean isInclude = t =~ /^@(?:lombok\.)?${annotationType}\.Include\b/
-            if (!isExclude && !isInclude) continue
-            for (int j = i + 1; j < lines.size(); j++) {
-                def m = lines[j].trim() =~ /^private\s+(?:final\s+)?[\w<>?,\[\]. ]+\s+(\w+)\s*[;=]/
-                if (m) {
-                    if (isExclude) excludes << m[0][1]
-                    else           includes << m[0][1]
-                    break
-                }
-                def fLine = lines[j].trim()
-                if (fLine =~ /^\{/ || fLine.startsWith('public ') || fLine.startsWith('protected ')) break
+            if (!isFieldLevelAnnotation(lines[i], annotationType)) continue
+            boolean isExclude = isExcludeAnnotation(lines[i], annotationType)
+            def fieldName = findFieldAfterAnnotation(lines, i + 1, annotationType)
+            if (fieldName) {
+                if (isExclude) excludes << fieldName
+                else includes << fieldName
             }
         }
         return [excludes: excludes, includes: includes]
@@ -171,7 +207,7 @@ trait SourceAnalyzer {
 
     String extractClassName(List<String> lines) {
         for (def line : lines) {
-            def m = line =~ /^\s*public\s+(?:(?:final|abstract)\s+)?class\s+(\w+)/
+            def m = line =~ CLASS_DECLARATION
             if (m) return m[0][1]
         }
         return 'Unknown'
