@@ -1,4 +1,4 @@
-class JavadocUtils extends SourceAnalyzer {
+trait JavadocUtils {
 
     private static final PARA_OPEN  = /^\*\s*<p>/
     private static final PARA_CLOSE = /<\/p>/

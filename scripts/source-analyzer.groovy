@@ -12,7 +12,7 @@ class AnnotationContext {
     boolean hasFields()               { !fields.isEmpty() }
 }
 
-class SourceAnalyzer {
+trait SourceAnalyzer {
 
     // ─── @Builder helpers ─────────────────────────────────────────────────────
 

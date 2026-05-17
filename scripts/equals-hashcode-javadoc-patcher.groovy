@@ -1,4 +1,4 @@
-class EqualsHashCodeJavadocPatcher extends JavadocUtils {
+class EqualsHashCodeJavadocPatcher implements JavadocUtils {
 
     private static final TOSTRING_METHOD  = /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/
     private static final EQUALS_METHOD    = /^public\s+boolean\s+equals\s*\(/

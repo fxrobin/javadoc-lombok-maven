@@ -1,12 +1,20 @@
-class LombokJavadocPropagator extends EqualsHashCodeJavadocPatcher {
+class LombokJavadocPropagator implements SourceAnalyzer, JavadocUtils {
 
-    private final BuilderJavadocPatcher builderPatcher = new BuilderJavadocPatcher()
+    private final BuilderJavadocPatcher        builderPatcher = new BuilderJavadocPatcher()
+    private final EqualsHashCodeJavadocPatcher eqPatcher      = new EqualsHashCodeJavadocPatcher()
 
-    // Delegates to BuilderJavadocPatcher; exposed here for test compatibility.
+    // Delegations exposed for test compatibility.
     List<String> patchBuilderSetters(List<String> lines,
                                       Map<String, String> getterReturns,
                                       Map<String, String> overrides) {
         builderPatcher.patchBuilderSetters(lines, getterReturns, overrides)
+    }
+
+    List<String> patchToStringEqualsHashCode(List<String> lines,
+                                              AnnotationContext tsCtx,
+                                              AnnotationContext eqCtx,
+                                              String className) {
+        eqPatcher.patchToStringEqualsHashCode(lines, tsCtx, eqCtx, className)
     }
 
     // ─── Entry point ──────────────────────────────────────────────────────────
@@ -42,8 +50,8 @@ class LombokJavadocPropagator extends EqualsHashCodeJavadocPatcher {
                                        : AnnotationContext.absent()
             def className   = extractClassName(patched)
 
-            patched = patchToStringEqualsHashCode(patched, tsCtx, eqCtx, className)
-            patched = patchClassJavadoc(patched, tsCtx, eqCtx, className)
+            patched = eqPatcher.patchToStringEqualsHashCode(patched, tsCtx, eqCtx, className)
+            patched = eqPatcher.patchClassJavadoc(patched, tsCtx, eqCtx, className)
         }
 
         delombokFile.write(patched.join('\n') + '\n', 'UTF-8')

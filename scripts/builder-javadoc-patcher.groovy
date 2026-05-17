@@ -1,4 +1,4 @@
-class BuilderJavadocPatcher extends JavadocUtils {
+class BuilderJavadocPatcher implements JavadocUtils {
 
     private static final BUILDER_CLASS_DECL = /^public static class (\w+)Builder\s*\{/
     private static final BUILD_METHOD       = /^public\s+\S+\s+build\s*\(\s*\)\s*\{/
