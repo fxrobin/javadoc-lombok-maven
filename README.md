@@ -1,62 +1,117 @@
-# Maven Javadoc Lombok Java 21 Demo
+# Maven Javadoc + Lombok — Java 25 Demo
 
-Projet de démonstration pour la génération de Javadoc avec Lombok et Java 21.
+Demonstration project showing how to generate complete, accurate Javadoc for a project using [Lombok](https://projectlombok.org/) annotations with Java 25 and Maven.
 
-Ce projet illustre comment générer une Javadoc complète prenant en compte les annotations Lombok (@Getter, @Setter, @Builder, @UtilityClass, etc.) en utilisant le plugin delombok.
+Companion article on [fxjavadevblog.fr](https://www.fxjavadevblog.fr).
 
-## Structure du projet
+---
+
+## The Problem
+
+Lombok generates boilerplate code (`@Builder`, `@ToString`, `@EqualsAndHashCode`, getters…) at compile time. Standard `javadoc` only sees the source — not the generated methods — leaving the Javadoc incomplete or full of warnings.
+
+## The Solution
+
+This project combines three steps in a Maven `javadoc` profile:
+
+1. **Delombok** — expands Lombok annotations into plain Java source
+2. **Groovy scripts** — post-process the expanded source to inject accurate Javadoc on generated methods
+3. **`javadoc:javadoc`** — generates the final HTML Javadoc from the patched source
+
+---
+
+## Groovy Script Pipeline
+
+The scripts live in `scripts/` and run via the [GMavenPlus](https://github.com/groovy/GMavenPlus) plugin. They are loaded in dependency order:
+
+| Script | Role |
+|--------|------|
+| `source-analyzer.groovy` | Parses Lombok annotations (`@Builder`, `@ToString`, `@EqualsAndHashCode`) and extracts field metadata from source files |
+| `javadoc-utils.groovy` | Shared Javadoc manipulation utilities (paragraph removal, blank-line collapsing, comment injection) |
+| `builder-javadoc-patcher.groovy` | Injects Javadoc on builder class, setter methods, `build()`, `toString()`, and factory method |
+| `equals-hashcode-javadoc-patcher.groovy` | Injects Javadoc on `equals()`, `hashCode()`, `canEqual()`, `toString()` and updates the class-level Javadoc |
+| `lombok-javadoc-propagator.groovy` | Entry point — orchestrates all patchers for each delomboked `.java` file |
+| `lombok-javadoc-propagator-tests.groovy` | Standalone self-tests (no build tool required) |
+
+The scripts use **Groovy traits** (`SourceAnalyzer`, `JavadocUtils`) for shared behavior and **composition** for collaborators — no inheritance chains.
+
+---
+
+## Groovy Self-Tests
+
+The script pipeline ships with a standalone test suite. No Maven, no build tool — just Groovy.
+
+Tests cover: annotation detection, field extraction, builder setter patching, `@Builder` override sections, `@ToString` / `@EqualsAndHashCode` parameter parsing, effective field computation, Javadoc injection, and paragraph removal.
+
+**Prerequisite:** Groovy installed locally. Install with [SDKMAN!](https://sdkman.io):
+
+```bash
+sdk install groovy
+```
+
+Verify:
+
+```bash
+groovy --version
+```
+
+```bash
+groovy scripts/lombok-javadoc-propagator-tests.groovy
+```
+
+Expected output:
+
+```
+Self-tests: PASSED
+```
+
+Run this after any change to the scripts to verify correctness before triggering the Maven build.
+
+---
+
+## Project Structure
 
 ```
 .
 ├── pom.xml
-├── README.md
-└── src
-   └── main
-      └── java
-         └── fr
-            └── fxjavadevblog
-               └── mvnlmbkjdoc
-                  ├── garage
-                  │  ├── Garage.java
-                  │  └── package-info.java
-                  └── vehicules
-                     ├── Energy.java
-                     ├── package-info.java
-                     ├── Vehicule.java
-                     └── VehiculeUtils.java
+├── scripts/                          # Groovy Javadoc enhancement pipeline
+└── src/main/java/fr/fxjavadevblog/mvnlmbkjdoc/
+    ├── garage/
+    │   └── Garage.java               # @Builder, @ToString
+    └── vehicules/
+        ├── Vehicule.java             # @Builder, @ToString, @EqualsAndHashCode
+        ├── VehiculeUtils.java        # @UtilityClass
+        └── Energy.java               # Enum
 ```
 
-## Classes
+---
 
-- **Vehicule** : Classe avec @Builder, @Getter, @EqualsAndHashCode, @ToString
-- **Garage** : Classe avec @Builder, @ToString
-- **VehiculeUtils** : Classe utilitaire avec @UtilityClass
-- **Energy** : Enum simple
+## Build
 
-## Génération de la Javadoc
-
-Pour générer la Javadoc avec prise en compte des annotations Lombok :
+### Generate Javadoc (with Lombok support)
 
 ```bash
-mvn clean compile javadoc:javadoc -Pjavadoc
+mvn javadoc:javadoc -P javadoc
 ```
 
-Le profil `javadoc` active le plugin delombok qui génère le code source développé à partir des annotations Lombok, puis le plugin javadoc utilise ce code généré.
+Output: `target/site/apidocs/`
 
-## Build normal
+### Skip the Groovy enhancement (raw delombok output only)
 
-Pour un build classique sans génération de javadoc :
+```bash
+mvn javadoc:javadoc -P javadoc -DskipJavadocEnhancement=true
+```
+
+### Standard build (no Javadoc)
 
 ```bash
 mvn clean compile
 ```
 
-## Vérification
+---
 
-La Javadoc générée contiendra :
-- Les méthodes du builder pour Vehicule et Garage
-- Les getters générés par Lombok
-- Les méthodes utilitaires de VehiculeUtils
-- Les constructeurs privés générés par @Builder
+## Requirements
 
-Sans le profil javadoc, la Javadoc serait incomplète et contiendrait des warnings.
+- Java 25
+- Maven 3.9+
+- Groovy (for standalone self-tests only — not required for the Maven build)
