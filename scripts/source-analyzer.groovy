@@ -1,3 +1,17 @@
+@groovy.transform.Canonical
+class AnnotationContext {
+    List<String>        fields = []
+    Map<String, Object> params = null   // null means annotation absent
+
+    static AnnotationContext of(List<String> fields, Map<String, Object> params) {
+        new AnnotationContext(fields, params)
+    }
+
+    static AnnotationContext absent() { new AnnotationContext() }
+    boolean isPresent()               { params != null }
+    boolean hasFields()               { !fields.isEmpty() }
+}
+
 class SourceAnalyzer {
 
     // ─── @Builder helpers ─────────────────────────────────────────────────────

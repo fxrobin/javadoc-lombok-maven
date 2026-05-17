@@ -84,8 +84,8 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
     // Injects Javadoc on toString(), equals(), canEqual(), hashCode() at outer class level only.
     // Uses brace-depth tracking to skip methods inside nested classes (e.g. XxxBuilder).
     List<String> patchToStringEqualsHashCode(List<String> lines,
-                                              List<String> tsFields, Map tsParams,
-                                              List<String> eqFields, Map eqParams,
+                                              AnnotationContext tsCtx,
+                                              AnnotationContext eqCtx,
                                               String className) {
         def result    = []
         int braceDepth = 0
@@ -99,26 +99,26 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
             braceDepth += trimmed.count('{') - trimmed.count('}')
 
             if (lineStartDepth == 1) {
-                if (tsParams && tsFields && (trimmed =~ TOSTRING_METHOD)) {
-                    injectToStringJavadoc(result, indent, className, tsFields, tsParams)
+                if (tsCtx.isPresent() && tsCtx.hasFields() && (trimmed =~ TOSTRING_METHOD)) {
+                    injectToStringJavadoc(result, indent, className, tsCtx.fields, tsCtx.params)
                     result << line
                     continue
                 }
 
-                if (eqParams && eqFields && (trimmed =~ EQUALS_METHOD)) {
-                    injectEqualsJavadoc(result, indent, eqFields, eqParams)
+                if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ EQUALS_METHOD)) {
+                    injectEqualsJavadoc(result, indent, eqCtx.fields, eqCtx.params)
                     result << line
                     continue
                 }
 
-                if (eqParams && (trimmed =~ CAN_EQUAL_METHOD)) {
+                if (eqCtx.isPresent() && (trimmed =~ CAN_EQUAL_METHOD)) {
                     injectCanEqualJavadoc(result, indent, className)
                     result << line
                     continue
                 }
 
-                if (eqParams && eqFields && (trimmed =~ HASHCODE_METHOD)) {
-                    injectHashCodeJavadoc(result, indent, eqFields)
+                if (eqCtx.isPresent() && eqCtx.hasFields() && (trimmed =~ HASHCODE_METHOD)) {
+                    injectHashCodeJavadoc(result, indent, eqCtx.fields)
                     result << line
                     continue
                 }
@@ -171,24 +171,22 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
         }
     }
 
-    private List<String> buildClassLevelParagraphs(String indent,
-                                                    List<String> eqFields, Map eqParams,
-                                                    List<String> tsFields, Map tsParams) {
+    private List<String> buildClassLevelParagraphs(String indent, AnnotationContext tsCtx, AnnotationContext eqCtx) {
         def paras = []
-        if (eqParams != null && eqFields) {
-            def refs = eqFields.collect { field -> "{@code ${field}}" }
-            def text = eqFields.size() == 1
+        if (eqCtx.isPresent() && eqCtx.hasFields()) {
+            def refs = eqCtx.fields.collect { field -> "{@code ${field}}" }
+            def text = eqCtx.fields.size() == 1
                 ? "Equality and hash code based solely on ${refs[0]}."
                 : "Equality and hash code based on: ${refs.join(', ')}."
-            if (eqParams.callSuper) text += " Includes superclass fields."
+            if (eqCtx.params.callSuper) text += " Includes superclass fields."
             paras << "${indent} * <p>${text}</p>"
         }
-        if (tsParams != null && tsFields) {
-            def refs = tsFields.collect { field -> "{@code ${field}}" }.join(', ')
-            def text = tsParams.includeFieldNames
+        if (tsCtx.isPresent() && tsCtx.hasFields()) {
+            def refs = tsCtx.fields.collect { field -> "{@code ${field}}" }.join(', ')
+            def text = tsCtx.params.includeFieldNames
                 ? "{@link #toString()} includes: ${refs}."
                 : "{@link #toString()} includes values of: ${refs} (no field names)."
-            if (tsParams.callSuper) text += " Includes fields from superclass."
+            if (tsCtx.params.callSuper) text += " Includes fields from superclass."
             paras << "${indent} * <p>${text}</p>"
         }
         return paras
@@ -214,8 +212,8 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
 
     // Replaces stale toString/equals <p> paragraphs in the class Javadoc and injects fresh ones.
     List<String> patchClassJavadoc(List<String> lines,
-                                    List<String> tsFields, Map tsParams,
-                                    List<String> eqFields, Map eqParams,
+                                    AnnotationContext tsCtx,
+                                    AnnotationContext eqCtx,
                                     String className) {
         int classIdx = findClassDeclarationIndex(lines, className)
         if (classIdx < 0) return lines
@@ -230,7 +228,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
         javadocLines = removeStaleClassJavadocParagraphs(javadocLines)
         javadocLines = collapseBlankJavadocLines(javadocLines)
 
-        def newParas = buildClassLevelParagraphs(indent, eqFields, eqParams, tsFields, tsParams)
+        def newParas = buildClassLevelParagraphs(indent, tsCtx, eqCtx)
         if (newParas)
             javadocLines = insertParagraphsIntoJavadoc(javadocLines, newParas, indent)
 

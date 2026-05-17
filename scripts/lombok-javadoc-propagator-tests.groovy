@@ -1,7 +1,8 @@
 // Run from project root: groovy scripts/lombok-javadoc-propagator-tests.groovy
 import groovy.transform.Field
 
-@Field def p  // initialized below after classloader setup
+@Field def p   // initialized below after classloader setup
+@Field def AC  // AnnotationContext class, loaded from gcl
 
 def thisDir = new File(getClass().protectionDomain.codeSource.location.toURI()).parentFile
 def gcl = new GroovyClassLoader(getClass().classLoader)
@@ -9,7 +10,8 @@ def gcl = new GroovyClassLoader(getClass().classLoader)
  'equals-hashcode-javadoc-patcher', 'lombok-javadoc-propagator'].each { name ->
     gcl.parseClass(new File(thisDir, "${name}.groovy"))
 }
-p = gcl.loadClass('LombokJavadocPropagator').newInstance()
+p  = gcl.loadClass('LombokJavadocPropagator').newInstance()
+AC = gcl.loadClass('AnnotationContext')
 
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -236,9 +238,11 @@ def testComputeEffectiveFields() {
 // ─── Method Javadoc injection tests ──────────────────────────────────────────
 
 def testEqualsHashCodeToStringPatching() {
-    def eqP = [of: ['id'], exclude: [], onlyExplicit: false, callSuper: false]
-    def tsP = [of: [], exclude: [], onlyExplicit: false, callSuper: false, includeFieldNames: true]
-    def txt = p.patchToStringEqualsHashCode(equalsHashCodeDelombokInput(), ['id'], tsP, ['id'], eqP, 'Baz').join('\n')
+    def eqP   = [of: ['id'], exclude: [], onlyExplicit: false, callSuper: false]
+    def tsP   = [of: [], exclude: [], onlyExplicit: false, callSuper: false, includeFieldNames: true]
+    def tsCtx = AC.of(['id'], tsP)
+    def eqCtx = AC.of(['id'], eqP)
+    def txt   = p.patchToStringEqualsHashCode(equalsHashCodeDelombokInput(), tsCtx, eqCtx, 'Baz').join('\n')
 
     assert txt.contains('Two instances are equal when {@code id} is equal.'), "equals Javadoc missing:\n${txt}"
     assert txt.contains('Returns a hash code consistent with {@link #equals}.'), "hashCode Javadoc missing:\n${txt}"
@@ -247,9 +251,11 @@ def testEqualsHashCodeToStringPatching() {
 }
 
 def testCanEqualPatching() {
-    def eqP = [of: ['id'], exclude: [], onlyExplicit: false, callSuper: false]
-    def tsP = [of: [], exclude: [], onlyExplicit: false, callSuper: false, includeFieldNames: true]
-    def txt = p.patchToStringEqualsHashCode(equalsHashCodeDelombokInput(), ['id'], tsP, ['id'], eqP, 'Baz').join('\n')
+    def eqP   = [of: ['id'], exclude: [], onlyExplicit: false, callSuper: false]
+    def tsP   = [of: [], exclude: [], onlyExplicit: false, callSuper: false, includeFieldNames: true]
+    def tsCtx = AC.of(['id'], tsP)
+    def eqCtx = AC.of(['id'], eqP)
+    def txt   = p.patchToStringEqualsHashCode(equalsHashCodeDelombokInput(), tsCtx, eqCtx, 'Baz').join('\n')
 
     assert txt.contains('Returns whether another object can be considered equal'), "canEqual Javadoc missing:\n${txt}"
     assert txt.contains('@param other the object to test'), "canEqual @param missing"

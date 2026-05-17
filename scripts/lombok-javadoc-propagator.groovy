@@ -36,18 +36,20 @@ class LombokJavadocPropagator extends EqualsHashCodeJavadocPatcher {
             def allFields   = extractAllFieldNames(sourceLines)
             def tsFieldAnns = extractFieldLevelAnnotations(sourceLines, 'ToString')
             def eqFieldAnns = extractFieldLevelAnnotations(sourceLines, 'EqualsAndHashCode')
-            def tsFields    = tsParams ? computeEffectiveFields(tsParams, tsFieldAnns, allFields) : []
-            def eqFields    = eqParams ? computeEffectiveFields(eqParams, eqFieldAnns, allFields) : []
+            def tsCtx       = tsParams ? AnnotationContext.of(computeEffectiveFields(tsParams, tsFieldAnns, allFields), tsParams)
+                                       : AnnotationContext.absent()
+            def eqCtx       = eqParams ? AnnotationContext.of(computeEffectiveFields(eqParams, eqFieldAnns, allFields), eqParams)
+                                       : AnnotationContext.absent()
             def className   = extractClassName(patched)
 
-            patched = patchToStringEqualsHashCode(patched, tsFields, tsParams, eqFields, eqParams, className)
-            patched = patchClassJavadoc(patched, tsFields, tsParams, eqFields, eqParams, className)
+            patched = patchToStringEqualsHashCode(patched, tsCtx, eqCtx, className)
+            patched = patchClassJavadoc(patched, tsCtx, eqCtx, className)
         }
 
         delombokFile.write(patched.join('\n') + '\n', 'UTF-8')
         def tags = [hasBuilder ? "@Builder" : null,
                     hasToString ? "@ToString" : null,
-                    hasEqHash ? "@EqualsAndHashCode" : null].findAll { it }.join(', ')
+                    hasEqHash ? "@EqualsAndHashCode" : null].findAll { tag -> tag != null }.join(', ')
         println "  Patched: ${delombokFile.name} [${tags}]"
     }
 }
