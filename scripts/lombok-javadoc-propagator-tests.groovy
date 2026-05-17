@@ -264,7 +264,7 @@ def testRemoveParagraphsMatching() {
         ' * <p>Other paragraph.</p>',
         ' */',
     ]
-    def cleaned = p.removeParagraphsMatching(javadoc) { it.toLowerCase().contains('equality') }
+    def cleaned = p.removeParagraphsMatching(javadoc) { line -> line.toLowerCase().contains('equality') }
     assert !cleaned.any { it.contains('Equality') }, "Should remove equality para"
     assert cleaned.any { it.contains('Other paragraph') }, "Should keep other para"
 }

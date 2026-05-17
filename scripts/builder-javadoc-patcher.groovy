@@ -44,7 +44,7 @@ class BuilderJavadocPatcher extends JavadocUtils {
                 if (result) result.removeLast()
             }
             result << "${indent}/**"
-            override.split('\n').each { result << "${indent} * ${it}" }
+            override.split('\n').each { overrideLine -> result << "${indent} * ${overrideLine}" }
             result << "${indent} */"
         } else {
             def returnText = getterReturns[fieldName] ?: ''
@@ -79,25 +79,30 @@ class BuilderJavadocPatcher extends JavadocUtils {
 
             def classM = (trimmed =~ /^public static class (\w+)Builder\s*\{/)
             if (classM) {
-                outerClassName = classM[0][1]; builderDepth = 1
+                outerClassName = classM[0][1]
+                builderDepth = 1
                 injectBuilderClassJavadoc(result, indent, outerClassName)
-                result << line; continue
+                result << line
+                continue
             }
 
             if (outerClassName && (trimmed =~ /^public\s+\S+\s+build\s*\(\s*\)\s*\{/)) {
                 injectBuildMethodJavadoc(result, indent, outerClassName)
-                result << line; continue
+                result << line
+                continue
             }
 
             if (builderDepth > 0 && outerClassName &&
                 (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
                 injectBuilderToStringJavadoc(result, indent, outerClassName)
-                result << line; continue
+                result << line
+                continue
             }
 
             if (outerClassName && (trimmed =~ /^public\s+static\s+\S+\s+builder\s*\(\s*\)\s*\{/)) {
                 injectBuilderFactoryJavadoc(result, indent, outerClassName)
-                result << line; continue
+                result << line
+                continue
             }
 
             def m = (trimmed =~ /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/)

@@ -23,7 +23,7 @@ class JavadocUtils extends SourceAnalyzer {
         def annotations = collectPrecedingAnnotations(result)
         if (!hasPrecedingJavadoc(result)) {
             result << "${indent}/**"
-            bodyLines.each { result << (it.isEmpty() ? "${indent} *" : "${indent} * ${it}") }
+            bodyLines.each { bodyLine -> result << (bodyLine.isEmpty() ? "${indent} *" : "${indent} * ${bodyLine}") }
             result << "${indent} */"
         }
         result.addAll(annotations)
@@ -41,7 +41,8 @@ class JavadocUtils extends SourceAnalyzer {
                 boolean matches = predicate.call(line)
                 if (t =~ /<\/p>/) {
                     if (!matches) result << line
-                    i++; continue
+                    i++
+                    continue
                 }
                 i++
                 while (i < javadocLines.size()) {

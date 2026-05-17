@@ -6,10 +6,10 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
                                         String className, List<String> fields, Map params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
-        def fieldRefs   = fields.collect { "{@code ${it}}" }.join(', ')
+        def fieldRefs   = fields.collect { field -> "{@code ${field}}" }.join(', ')
         def format      = params.includeFieldNames
-            ? "${className}(" + fields.collect { "${it}=…" }.join(', ') + ")"
-            : "${className}(" + fields.collect { '…' }.join(', ') + ")"
+            ? "${className}(" + fields.collect { field -> "${field}=…" }.join(', ') + ")"
+            : "${className}(" + fields.collect { _ -> '…' }.join(', ') + ")"
         result << "${indent}/**"
         result << "${indent} * Returns a string representation of this instance."
         result << "${indent} * Includes: ${fieldRefs}."
@@ -28,7 +28,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
                                       List<String> fields, Map params) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
-        def fieldRefs   = fields.collect { "{@code ${it}}" }
+        def fieldRefs   = fields.collect { field -> "{@code ${field}}" }
         result << "${indent}/**"
         if (fields.size() == 1) {
             result << "${indent} * Two instances are equal when ${fieldRefs[0]} is equal."
@@ -65,7 +65,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
     private void injectHashCodeJavadoc(List<String> result, String indent, List<String> fields) {
         if (hasPrecedingJavadoc(result)) return
         def annotations = collectPrecedingAnnotations(result)
-        def fieldRefs   = fields.collect { "{@code ${it}}" }.join(', ')
+        def fieldRefs   = fields.collect { field -> "{@code ${field}}" }.join(', ')
         result << "${indent}/**"
         result << "${indent} * Returns a hash code consistent with {@link #equals}."
         result << "${indent} * Based on: ${fieldRefs}."
@@ -96,25 +96,29 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
                 if (tsParams && tsFields &&
                     (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
                     injectToStringJavadoc(result, indent, className, tsFields, tsParams)
-                    result << line; continue
+                    result << line
+                    continue
                 }
 
                 if (eqParams && eqFields &&
                     (trimmed =~ /^public\s+boolean\s+equals\s*\(/)) {
                     injectEqualsJavadoc(result, indent, eqFields, eqParams)
-                    result << line; continue
+                    result << line
+                    continue
                 }
 
                 if (eqParams &&
                     (trimmed =~ /^protected\s+boolean\s+canEqual\s*\(/)) {
                     injectCanEqualJavadoc(result, indent, className)
-                    result << line; continue
+                    result << line
+                    continue
                 }
 
                 if (eqParams && eqFields &&
                     (trimmed =~ /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/)) {
                     injectHashCodeJavadoc(result, indent, eqFields)
-                    result << line; continue
+                    result << line
+                    continue
                 }
             }
 
@@ -170,7 +174,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
                                                     List<String> tsFields, Map tsParams) {
         def paras = []
         if (eqParams != null && eqFields) {
-            def refs = eqFields.collect { "{@code ${it}}" }
+            def refs = eqFields.collect { field -> "{@code ${field}}" }
             def text = eqFields.size() == 1
                 ? "Equality and hash code based solely on ${refs[0]}."
                 : "Equality and hash code based on: ${refs.join(', ')}."
@@ -178,7 +182,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
             paras << "${indent} * <p>${text}</p>"
         }
         if (tsParams != null && tsFields) {
-            def refs = tsFields.collect { "{@code ${it}}" }.join(', ')
+            def refs = tsFields.collect { field -> "{@code ${field}}" }.join(', ')
             def text = tsParams.includeFieldNames
                 ? "{@link #toString()} includes: ${refs}."
                 : "{@link #toString()} includes values of: ${refs} (no field names)."

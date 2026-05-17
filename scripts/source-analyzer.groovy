@@ -3,7 +3,7 @@ class SourceAnalyzer {
     // ─── @Builder helpers ─────────────────────────────────────────────────────
 
     boolean hasBuilderAnnotation(List<String> lines) {
-        lines.any { it.trim() =~ /^@(lombok\.)?Builder(\(.*\))?$/ }
+        lines.any { line -> line.trim() =~ /^@(lombok\.)?Builder(\(.*\))?$/ }
     }
 
     // Extracts @return text from getter methods in delombok output.
@@ -43,7 +43,7 @@ class SourceAnalyzer {
             while (k < lines.size() && lines[k].trim().startsWith('@')) k++
             if (k < lines.size()) {
                 def fm = (lines[k].trim() =~ /^private\s+(?:final\s+)?[\w<>?,.\[\] ]+\s+(\w+)\s*[;=]/)
-                if (fm) result[fm[0][1]] = overrideLines.findAll { it }.join('\n')
+                if (fm) result[fm[0][1]] = overrideLines.findAll { line -> !line.isEmpty() }.join('\n')
             }
         }
         return result
@@ -77,7 +77,7 @@ class SourceAnalyzer {
         if (m) return [m[0][1]]
         m = ann =~ /\b${param}\s*=\s*\{([^}]*)\}/
         if (!m) return []
-        return (m[0][1] =~ /"(\w+)"/).collect { it[1] }
+        return (m[0][1] =~ /"(\w+)"/).collect { match -> match[1] }
     }
 
     boolean parseBoolParam(String ann, String param, boolean defaultVal = false) {
