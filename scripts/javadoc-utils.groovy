@@ -1,5 +1,8 @@
 class JavadocUtils extends SourceAnalyzer {
 
+    private static final PARA_OPEN  = /^\*\s*<p>/
+    private static final PARA_CLOSE = /<\/p>/
+
     // Returns true if result buffer ends with */ (skipping blank lines and annotations).
     boolean hasPrecedingJavadoc(List<String> result) {
         for (int i = result.size() - 1; i >= 0; i--) {
@@ -36,10 +39,10 @@ class JavadocUtils extends SourceAnalyzer {
         while (i < javadocLines.size()) {
             def line = javadocLines[i]
             def t    = line.trim()
-            if (t =~ /^\*\s*<p>/) {
+            if (t =~ PARA_OPEN) {
                 def paraLines = [line]
                 boolean matches = predicate.call(line)
-                if (t =~ /<\/p>/) {
+                if (t =~ PARA_CLOSE) {
                     if (!matches) result << line
                     i++
                     continue
@@ -50,7 +53,7 @@ class JavadocUtils extends SourceAnalyzer {
                     paraLines << nl
                     if (predicate.call(nl)) matches = true
                     i++
-                    if (nl.trim() =~ /<\/p>/) break
+                    if (nl.trim() =~ PARA_CLOSE) break
                 }
                 if (!matches) result.addAll(paraLines)
                 continue

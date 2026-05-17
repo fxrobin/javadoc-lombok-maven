@@ -1,5 +1,11 @@
 class BuilderJavadocPatcher extends JavadocUtils {
 
+    private static final BUILDER_CLASS_DECL = /^public static class (\w+)Builder\s*\{/
+    private static final BUILD_METHOD       = /^public\s+\S+\s+build\s*\(\s*\)\s*\{/
+    private static final BUILDER_TOSTRING   = /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/
+    private static final BUILDER_FACTORY    = /^public\s+static\s+\S+\s+builder\s*\(\s*\)\s*\{/
+    private static final BUILDER_SETTER     = /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/
+
     private void injectBuilderClassJavadoc(List<String> result, String indent, String outerClassName) {
         if (!hasPrecedingJavadoc(result)) {
             def annotations = collectPrecedingAnnotations(result)
@@ -77,7 +83,7 @@ class BuilderJavadocPatcher extends JavadocUtils {
             if (builderDepth > 0)
                 builderDepth += trimmed.count('{') - trimmed.count('}')
 
-            def classM = (trimmed =~ /^public static class (\w+)Builder\s*\{/)
+            def classM = (trimmed =~ BUILDER_CLASS_DECL)
             if (classM) {
                 outerClassName = classM[0][1]
                 builderDepth = 1
@@ -86,26 +92,25 @@ class BuilderJavadocPatcher extends JavadocUtils {
                 continue
             }
 
-            if (outerClassName && (trimmed =~ /^public\s+\S+\s+build\s*\(\s*\)\s*\{/)) {
+            if (outerClassName && (trimmed =~ BUILD_METHOD)) {
                 injectBuildMethodJavadoc(result, indent, outerClassName)
                 result << line
                 continue
             }
 
-            if (builderDepth > 0 && outerClassName &&
-                (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
+            if (builderDepth > 0 && outerClassName && (trimmed =~ BUILDER_TOSTRING)) {
                 injectBuilderToStringJavadoc(result, indent, outerClassName)
                 result << line
                 continue
             }
 
-            if (outerClassName && (trimmed =~ /^public\s+static\s+\S+\s+builder\s*\(\s*\)\s*\{/)) {
+            if (outerClassName && (trimmed =~ BUILDER_FACTORY)) {
                 injectBuilderFactoryJavadoc(result, indent, outerClassName)
                 result << line
                 continue
             }
 
-            def m = (trimmed =~ /^public\s+\S+Builder\s+(\w+)\s*\(final\s+.+\s+(\w+)\s*\)/)
+            def m = (trimmed =~ BUILDER_SETTER)
             if (m && m[0][1] == m[0][2])
                 injectBuilderSetterJavadoc(result, indent, m[0][1], getterReturns, overrides)
 

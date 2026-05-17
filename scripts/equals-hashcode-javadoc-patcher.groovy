@@ -1,5 +1,11 @@
 class EqualsHashCodeJavadocPatcher extends JavadocUtils {
 
+    private static final TOSTRING_METHOD  = /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/
+    private static final EQUALS_METHOD    = /^public\s+boolean\s+equals\s*\(/
+    private static final CAN_EQUAL_METHOD = /^protected\s+boolean\s+canEqual\s*\(/
+    private static final HASHCODE_METHOD  = /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/
+    private static final JAVADOC_TAG_LINE = /^\*\s*@/
+
     // ─── @ToString / @EqualsAndHashCode method Javadoc injection ─────────────
 
     private void injectToStringJavadoc(List<String> result, String indent,
@@ -93,29 +99,25 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
             braceDepth += trimmed.count('{') - trimmed.count('}')
 
             if (lineStartDepth == 1) {
-                if (tsParams && tsFields &&
-                    (trimmed =~ /^public\s+java\.lang\.String\s+toString\s*\(\s*\)\s*\{/)) {
+                if (tsParams && tsFields && (trimmed =~ TOSTRING_METHOD)) {
                     injectToStringJavadoc(result, indent, className, tsFields, tsParams)
                     result << line
                     continue
                 }
 
-                if (eqParams && eqFields &&
-                    (trimmed =~ /^public\s+boolean\s+equals\s*\(/)) {
+                if (eqParams && eqFields && (trimmed =~ EQUALS_METHOD)) {
                     injectEqualsJavadoc(result, indent, eqFields, eqParams)
                     result << line
                     continue
                 }
 
-                if (eqParams &&
-                    (trimmed =~ /^protected\s+boolean\s+canEqual\s*\(/)) {
+                if (eqParams && (trimmed =~ CAN_EQUAL_METHOD)) {
                     injectCanEqualJavadoc(result, indent, className)
                     result << line
                     continue
                 }
 
-                if (eqParams && eqFields &&
-                    (trimmed =~ /^public\s+int\s+hashCode\s*\(\s*\)\s*\{/)) {
+                if (eqParams && eqFields && (trimmed =~ HASHCODE_METHOD)) {
                     injectHashCodeJavadoc(result, indent, eqFields)
                     result << line
                     continue
@@ -200,7 +202,7 @@ class EqualsHashCodeJavadocPatcher extends JavadocUtils {
             def t = javadocLines[i].trim()
             if (t.contains('<pre>'))  inPre = true
             if (t.contains('</pre>')) inPre = false
-            if (!inPre && t =~ /^\*\s*@/) { insertIdx = i; break }
+            if (!inPre && t =~ JAVADOC_TAG_LINE) { insertIdx = i; break }
         }
         if (javadocLines[insertIdx - 1].trim() != '*') javadocLines.add(insertIdx++, "${indent} *")
         newParas.eachWithIndex { para, idx -> javadocLines.add(insertIdx + idx, para) }
