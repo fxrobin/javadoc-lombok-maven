@@ -16,6 +16,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <lombok.version>1.18.46</lombok.version>
+        <jilt.version>1.9.1</jilt.version>
         <skipJavadocEnhancement>false</skipJavadocEnhancement>
     </properties>
 
@@ -24,6 +25,12 @@
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <version>${lombok.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>cc.jilt</groupId>
+            <artifactId>jilt</artifactId>
+            <version>${jilt.version}</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>
@@ -40,6 +47,11 @@
                             <groupId>org.projectlombok</groupId>
                             <artifactId>lombok</artifactId>
                             <version>${lombok.version}</version>
+                        </path>
+                        <path>
+                            <groupId>cc.jilt</groupId>
+                            <artifactId>jilt</artifactId>
+                            <version>${jilt.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>
@@ -121,7 +133,7 @@
                         <artifactId>maven-javadoc-plugin</artifactId>
                         <version>3.12.0</version>
                         <configuration>
-                            <sourcepath>${project.build.directory}/generated-sources/delombok</sourcepath>
+                            <sourcepath>${project.build.directory}/generated-sources/delombok:${project.build.directory}/generated-sources/annotations</sourcepath>
                             <!-- Suppress "missing" doclint category for Lombok-generated methods
                                  (builder setter @param and build() comment are not controllable from source) -->
                             <doclint>all,-missing</doclint>
